@@ -1,7 +1,9 @@
 # Cmake Files
 CMakeFiles
 CMakeScripts
+CMakeCache.txt
 Makefile
+cmake_install.cmake
 
 # VS Code
 .vscode/

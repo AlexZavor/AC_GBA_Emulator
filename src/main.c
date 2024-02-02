@@ -9,6 +9,9 @@ const int SCREEN_HEIGHT = 480;
 
 int main(int argc, char* argv[])
 {
+	#ifdef DEBUG
+		printf("Test");
+	#endif
 	//The window we'll be rendering to
 	SDL_Window* window = NULL;
 	
