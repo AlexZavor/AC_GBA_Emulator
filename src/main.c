@@ -1,7 +1,8 @@
 #define SDL_MAIN_HANDLED
-#include <SDL2/SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "SDL2/SDL.h"
+#include "headers/inputData.h"
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;

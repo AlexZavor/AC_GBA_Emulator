@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(GameBoyAdvanceEmulator  VERSION 1.0.0
-        DESCRIPTION "C implemented emulator for Game Boy Advanced Games"
+        DESCRIPTION "C implemented emulator for the Game Boy Advance"
         LANGUAGES C)
 
 set(DEBUG TRUE)

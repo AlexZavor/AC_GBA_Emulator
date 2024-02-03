@@ -4,6 +4,10 @@ CMakeScripts
 CMakeCache.txt
 Makefile
 cmake_install.cmake
+ALL_BUILD*
+ZERO_CHECK*
+GBA.vcxproj*
+GameBoyAdvanceEmulator.sln
 
 # VS Code
 .vscode/
