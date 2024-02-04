@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(GameBoyAdvanceEmulator  VERSION 1.0.0
-        DESCRIPTION "C implemented emulator for the Game Boy Advance"
-        LANGUAGES C)
+        DESCRIPTION "C++ implemented emulator for the Game Boy Advance"
+        LANGUAGES CXX)
 
 set(DEBUG TRUE)
         
@@ -12,7 +12,7 @@ include_directories(include)
 
 ############### Main Build ###############
 
-add_executable(GBA src/main.c)
+add_executable(GBA src/main.cpp)
 
 
 find_package(SDL2 REQUIRED)
