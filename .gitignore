@@ -12,6 +12,8 @@ GameBoyAdvanceEmulator.sln
 # VS Code
 .vscode/
 *.exe
+.cmake/
+compile_commands.json
 
 
 # Rom Files
