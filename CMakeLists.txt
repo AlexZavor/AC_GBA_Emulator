@@ -14,6 +14,7 @@ include_directories(include)
 
 add_executable(GBA src/main.cpp)
 
+target_sources(GBA PRIVATE "res/icon.rc")
 
 find_package(SDL2 REQUIRED)
 
