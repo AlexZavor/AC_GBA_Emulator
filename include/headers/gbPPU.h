@@ -2,8 +2,12 @@
 #define GBPPU_H
 
 class gbPPU{
+    private:
+        gbMEM* MEM;
     public:
-        gbPPU(){};
+        gbPPU(gbMEM* MEM){
+            MEM = MEM;
+        };
 };
 
 #endif /* GBPPU_H */

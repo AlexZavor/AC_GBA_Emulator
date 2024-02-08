@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
-#include "SDL2/SDL.h"
+#include "SDL.h"
 #include "inputData.h"
 #include "gbMEM.h"
 #include "gbCPU.h"
@@ -11,16 +11,17 @@
 
 class gbEmulator{
     private:
-        gbMEM* MEM = new gbMEM();
-        gbCPU* CPU = new gbCPU();
-        gbPPU* PPU = new gbPPU();
+        gbMEM* MEM;
+        gbCPU* CPU;
+        gbPPU* PPU;
     public:
+        //Constructor. should initialize things like memory and prepare for first instruction
+        gbEmulator();
         //Calls the GB Emulator to run for one frame and return the output
-        bool runFrame(inputData input, SDL_Renderer*){};
+        void runFrame(inputData input, SDL_Renderer* renderer);
         //Inserts a cartrage into the Game Boy
-        bool insertCart(FILE* game){};
+        bool insertCart(std::string game);
 
-        gbEmulator(){};
 };
 
 #endif /* GBEMULATOR_H */

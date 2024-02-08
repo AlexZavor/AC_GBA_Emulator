@@ -1,32 +1,31 @@
 #define SDL_MAIN_HANDLED
-#include <stdbool.h>
 #include <stdio.h>
-#include "SDL2/SDL.h"
-#include "headers/inputData.h"
-#include "headers/gbEmulator.h"
+#include "SDL.h"
+#include "inputData.h"
+#include "gbEmulator.h"
 
-#define SCALE 3
+#define SCALE 6
 //Screen dimension constants
 #define SCREEN_WIDTH (160 * SCALE)
 #define SCREEN_HEIGHT (144 * SCALE)
 
-FILE* file = fopen("ROMS/Tetris.gb", "r");
+#define GAME "ROMS/Tetris.gb"
 
-bool initializeSDL(SDL_Window* window, SDL_Renderer* renderer){
+bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 	//Initialize SDL
 	if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
 		printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError() );
 		return 0;
 	}
 	//Create window
-	window = SDL_CreateWindow( "--AC-GBA--", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
-	if( window == NULL ) {
+	*window = SDL_CreateWindow( "--AC-GBA--", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
+	if( *window == NULL ) {
 		printf( "Window could not be created! SDL_Error: %s\n", SDL_GetError() );
 		return 0;
 	}
 	//Create vsynced renderer for window
-	renderer = SDL_CreateRenderer( window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC );
-	if( renderer == NULL ) {
+	*renderer = SDL_CreateRenderer( *window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC );
+	if( *renderer == NULL ) {
 		printf( "Renderer could not be created! SDL Error: %s\n", SDL_GetError() );
 	}
 
@@ -57,16 +56,17 @@ int main(int argc, char* argv[]) {
 	inputData input;
 	resetInputData(&input);
 
-	if(initializeSDL(window, renderer)){
+	if(initializeSDL(&window, &renderer)){
 		//main loop logic
 		bool quit = false;
-		gbEmulator* Emulator = new gbEmulator();
-		if(file != nullptr){
-			Emulator->insertCart(file);
-			printf("win");
-		}else{printf("hec");}
-		while(!quit){
 
+		//Create Emulator
+		gbEmulator* Emulator = new gbEmulator();
+
+		Emulator->insertCart(GAME);
+		SDL_RenderSetScale(renderer, SCALE, SCALE);
+
+		while(!quit){
 			//Handle events on queue
 			while( SDL_PollEvent( &e ) != 0 ) {
 				//User requests quit
@@ -112,8 +112,9 @@ int main(int argc, char* argv[]) {
 			
 			Emulator->runFrame(input, renderer);
 
-
 			//Update screen
+			SDL_SetRenderDrawColor(renderer, 255,0,0,255);
+			SDL_RenderDrawLine(renderer, 0, 0, rand()%100, rand()%100);
 			SDL_RenderPresent( renderer );
 		}
 

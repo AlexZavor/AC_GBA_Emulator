@@ -5,14 +5,18 @@ project(GameBoyAdvanceEmulator  VERSION 1.0.0
         LANGUAGES CXX)
 
 set(DEBUG TRUE)
-        
+
 link_directories(lib)
 set(SDL2_DIR "lib/cmake/SDL2")
 include_directories(include)
+include_directories(include/headers)
+include_directories(include/SDL2)
 
 ############### Main Build ###############
 
-add_executable(GBA src/main.cpp)
+file(GLOB GBA_SRC CONFIGURE_DEPENDS "src/*.cpp")
+
+add_executable(GBA ${GBA_SRC})
 
 target_sources(GBA PRIVATE "res/icon.rc")
 
