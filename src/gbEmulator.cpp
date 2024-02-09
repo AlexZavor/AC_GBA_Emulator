@@ -9,7 +9,8 @@ gbEmulator::gbEmulator() {
 void gbEmulator::runFrame(inputData input, SDL_Renderer* renderer) {
     for (uint8_t line = 0; line < 154; line++)
     {
-        int cyclecount = 456; 
+        static int cyclecount = 0; 
+        cyclecount += 456;
         while (cyclecount > 0)
         {
             // CPU->printInstruction();
@@ -18,7 +19,7 @@ void gbEmulator::runFrame(inputData input, SDL_Renderer* renderer) {
         //Draw line
     }
     //return frame
-    printf("Frame!\n");
+    // printf("Frame!\n");
 }
 
 bool gbEmulator::insertCart(std::string game) {

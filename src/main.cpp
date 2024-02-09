@@ -4,7 +4,7 @@
 #include "inputData.h"
 #include "gbEmulator.h"
 
-#define SCALE 6
+#define SCALE 4
 //Screen dimension constants
 #define SCREEN_WIDTH (160 * SCALE)
 #define SCREEN_HEIGHT (144 * SCALE)

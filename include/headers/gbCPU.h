@@ -51,7 +51,8 @@ struct reg {
 class gbCPU{
     private:
         gbMEM* MEM;
-        //Main CPU Registers, A,B,C,D,E,F,H,L,pc,sp.
+        uint8_t* dMEM;
+        //Main CPU Registers, A,B,C,D,E,F,H,L,sp,pc.
         //also adressible through common combinations like HL or AF
         struct reg registers;
 
@@ -65,9 +66,11 @@ class gbCPU{
         int interrupts();
     
     private:
+        //set registers to correct values
         void initCpu();
-        //Stack operations for you know... stack
+        //Push data onto the stack
         void PushStack(uint8_t data);
+        //Pop data off stack
         uint8_t PopStack();
         //Set of extra instructions
         uint8_t CBPrefix();

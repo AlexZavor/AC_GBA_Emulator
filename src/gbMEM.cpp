@@ -30,13 +30,11 @@ gbMEM::gbMEM() {
     initMem();
 }
 
-uint8_t gbMEM::qRead(uint16_t address){return MEM[address];}
+
+// read/write commands to check for cartrage opperation (not active yet)
 uint8_t gbMEM::read(uint16_t address){return 0;}
-void gbMEM::qWrite(uint16_t address, uint8_t data){MEM[address] = data;}
 void gbMEM::write(uint16_t address, uint8_t data){}
-void gbMEM::orQWrite(uint16_t address, uint8_t data){MEM[address] |= data;}
 void gbMEM::orWrite(uint16_t address, uint8_t data){}
-void gbMEM::andQWrite(uint16_t address, uint8_t data){MEM[address] &= data;}
 void gbMEM::andWrite(uint16_t address, uint8_t data){}
 
 
@@ -76,6 +74,7 @@ std::streampos size;
     for (int i = 0x134; i < 0x142; i++) {
         std::cout << ((char)MEM[i]);
     }
+    printf("\n");
 	return true;
 }
 
