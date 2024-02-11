@@ -19,3 +19,6 @@ compile_commands.json
 # Rom Files
 ROMS/
 SAVES/
+
+#Testing
+example.txt

@@ -9,7 +9,9 @@
 #define SCREEN_WIDTH (160 * SCALE)
 #define SCREEN_HEIGHT (144 * SCALE)
 
-#define GAME "ROMS/Tetris.gb"
+#define GAME "ROMS/DRMario.gb"
+// #define GAME "ROMS/cpu_instrs.gb"
+// #define GAME "ROMS/07-jr,jp,call,ret,rst.gb"
 
 bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 	//Initialize SDL
@@ -57,65 +59,66 @@ int main(int argc, char* argv[]) {
 	resetInputData(&input);
 
 	if(initializeSDL(&window, &renderer)){
+		SDL_RenderSetScale(renderer, SCALE, SCALE);
 		//main loop logic
 		bool quit = false;
 
 		//Create Emulator
-		gbEmulator* Emulator = new gbEmulator();
+		gbEmulator* Emulator = new gbEmulator(renderer);
 
-		Emulator->insertCart(GAME);
-		SDL_RenderSetScale(renderer, SCALE, SCALE);
+		if(Emulator->insertCart(GAME)){
 
-		while(!quit){
-			//Handle events on queue
-			while( SDL_PollEvent( &e ) != 0 ) {
-				//User requests quit
-				if( e.type == SDL_QUIT ) {
-					quit = true;
-				}
-				//User presses a key
-				else if( e.type == SDL_KEYDOWN ) {
-					//Select surfaces based on key press
-					switch( e.key.keysym.sym ) {
-						case SDLK_UP:
-						input.up = 1;
-						break;
-						case SDLK_DOWN:
-						input.down = 1;
-						break;
-						case SDLK_LEFT:
-						input.left = 1;
-						break;
-						case SDLK_RIGHT:
-						input.right = 1;
-						break;
+			while(!quit){
+				//Handle events on queue
+				while( SDL_PollEvent( &e ) != 0 ) {
+					//User requests quit
+					if( e.type == SDL_QUIT ) {
+						quit = true;
+					}
+					//User presses a key
+					else if( e.type == SDL_KEYDOWN ) {
+						//Select surfaces based on key press
+						switch( e.key.keysym.sym ) {
+							case SDLK_UP:
+							input.up = 1;
+							break;
+							case SDLK_DOWN:
+							input.down = 1;
+							break;
+							case SDLK_LEFT:
+							input.left = 1;
+							break;
+							case SDLK_RIGHT:
+							input.right = 1;
+							break;
+						}
+					}
+					else if( e.type == SDL_KEYUP ) {
+						//Select surfaces based on key press
+						switch( e.key.keysym.sym ) {
+							case SDLK_UP:
+							input.up = 0;
+							break;
+							case SDLK_DOWN:
+							input.down = 0;
+							break;
+							case SDLK_LEFT:
+							input.left = 0;
+							break;
+							case SDLK_RIGHT:
+							input.right = 0;
+							break;
+						}
 					}
 				}
-				else if( e.type == SDL_KEYUP ) {
-					//Select surfaces based on key press
-					switch( e.key.keysym.sym ) {
-						case SDLK_UP:
-						input.up = 0;
-						break;
-						case SDLK_DOWN:
-						input.down = 0;
-						break;
-						case SDLK_LEFT:
-						input.left = 0;
-						break;
-						case SDLK_RIGHT:
-						input.right = 0;
-						break;
-					}
-				}
+				
+				Emulator->runFrame(input);
+
+				//Update screen
+				// SDL_SetRenderDrawColor(renderer, 255,0,0,255);
+				// SDL_RenderDrawLine(renderer, 0, 0, rand()%100, rand()%100);
+				SDL_RenderPresent( renderer );
 			}
-			
-			Emulator->runFrame(input, renderer);
-
-			//Update screen
-			SDL_SetRenderDrawColor(renderer, 255,0,0,255);
-			SDL_RenderDrawLine(renderer, 0, 0, rand()%100, rand()%100);
-			SDL_RenderPresent( renderer );
 		}
 
 		delete Emulator;

@@ -56,14 +56,22 @@ class gbCPU{
         //also adressible through common combinations like HL or AF
         struct reg registers;
 
+        
+        bool IME; //Interrupt Master Enable
+        bool preIME; //used because IME only returns after one instruction
+        bool halted; //Shows if the CPU is Halted
+        uint8_t DMA;
+        uint8_t DIV;
+        int lineprogress;
+
     public:
         gbCPU(gbMEM* memory);
         //Returns number of cycles taken to execute
         uint8_t instruction();
         void printInstruction();
 
-        void timers();
-        int interrupts();
+        void timers(uint8_t clock);
+        int interrupts(int cycles);
     
     private:
         //set registers to correct values

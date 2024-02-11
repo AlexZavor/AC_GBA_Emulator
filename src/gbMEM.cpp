@@ -1,4 +1,5 @@
 #include "gbMEM.h"
+#include <math.h>
 /*
 Interrupt Enable Register
 --------------------------- FFFF
@@ -32,10 +33,103 @@ gbMEM::gbMEM() {
 
 
 // read/write commands to check for cartrage opperation (not active yet)
-uint8_t gbMEM::read(uint16_t address){return 0;}
-void gbMEM::write(uint16_t address, uint8_t data){}
-void gbMEM::orWrite(uint16_t address, uint8_t data){}
-void gbMEM::andWrite(uint16_t address, uint8_t data){}
+uint8_t gbMEM::read(uint16_t address){
+	if (address < 0xC000)
+	{
+		// //Cartrage ram
+		// if (RAMEnabled) {
+		// 	return ram[address - 0xA000 + (0x4000 * rambank)];
+		// }
+		// else {
+		// 	return 0;
+		// 	std::cout << "ram not enabled" << std::endl;
+		// }
+	}
+	else if (address < 0xD000);
+	else if (address < 0xE000)
+	{
+		//Switching Work Ram (GBC)
+		//return Wram[(address - 0xC000) + (WramBank * 0x1000)];
+	}
+	else if (address < 0xFE00);
+
+	return MEM[address];
+
+}
+void gbMEM::write(uint16_t address, uint8_t data){
+	if (address < 0x8000) {
+		//Writing to cartrage. probably a register
+		// std::cout << "cartrage write" << std::endl;
+		switch (cartMBC) {
+		case MBC::NONE:
+			//std::cout << "probably tetris being annoying" << std::endl;
+			break;
+		case MBC::MBC1:
+			if (address < 0x2000) {
+				//Ram Enable
+				if ((data & 0x0F) == 0x0A) {
+					RAMEnabled = true;
+				}
+				else {
+					RAMEnabled = false;
+				}
+			}
+			else if (address < 0x4000) {
+				//ROM Bank Number
+				bank = data & 0x1F;
+				if (bank == 0) {
+					bank = 1;
+				}
+				if (banks < 16) {
+					bank &= 0b00001111;
+				}if (banks < 8) {
+					bank &= 0b00000111;
+				}if (banks < 4) {
+					bank &= 0b00000011;
+				}
+				printf("Bank swap - %d\n", bank);
+				for (int byte = 0; byte < 0x4000; byte++)
+				{
+					MEM[0x4000 + byte] = cartrage[((long)bank * (long)0x4000) + byte];
+				}
+			}
+			else if (address < 0x6000) {
+				//RAM Bank Number
+				// rambank = data;
+				// if (rambank > rambanks) {
+				// 	rambank = 0;
+				// }
+			}
+			break;
+		default:
+			break;
+		}
+		return;
+	}
+	else if (address < 0xC000)
+	{
+		//Cartrage ram
+		// if (RAMEnabled) {
+		// 	ram[(address - 0xA000) + (0x4000 * rambank)];
+		// }
+		// else {
+		// 	//Do nothing
+		// 	std::cout << "ram not enabled" << std::endl;
+		// }
+	}
+	else if (address < 0xD000);
+	else if (address < 0xE000)
+	{
+		//Switching Work Ram (GBC)
+		// Wram[(address - 0xC000) + (WramBank * 0x1000)] = data;
+	}
+	else if (address < 0xFE00);
+
+	MEM[address] = data;
+	
+}
+void gbMEM::orWrite(uint16_t address, uint8_t data){MEM[address] |= data;}
+void gbMEM::andWrite(uint16_t address, uint8_t data){MEM[address] &= data;}
 
 
 bool gbMEM::insertCart(std::string game){
@@ -51,18 +145,18 @@ std::streampos size;
 		for (int d = 0; d < 0x8000; d++) {
 			MEM[d] = cartrage[d];
 		}
-		// if (!setMBC(MEM[0x0147])) {
-		// 	std::cout << "Unrecognized MBC - ";
-		// 	printf("%.2X\n", MEM[0x0147]);
-		// 	return false;
-		// }
-		// else {
-		// 	setBanks(MEM[0x0148]);
-		// 	std::cout << "loading save - ";
-		// 	setRam(MEM[0x0149], Game, MEM);
-		// 	std::cout << "Cartrage Loaded - ";
-		// 	printf("%.2X\n", MEM[0x0147]);
-		// }
+		if (!setMBC(MEM[0x0147])) {
+			std::cout << "Unrecognized MBC - ";
+			printf("%.2X\n", MEM[0x0147]);
+			return false;
+		}
+		else {
+			setBanks(MEM[0x0148]);
+			// std::cout << "loading save - ";
+			// setRam(MEM[0x0149], Game, MEM);
+			// std::cout << "Cartrage Loaded - ";
+			// printf("%.2X\n", MEM[0x0147]);
+		}
 	}
 	else {
 		printf("unable to load Cartrage!\n");
@@ -111,4 +205,24 @@ void gbMEM::initMem() {
 	MEM[0xFF47] = 0xFC;
 	MEM[0xFF48] = 0xFF;
 	MEM[0xFF49] = 0xFF;
+}
+
+bool gbMEM::setMBC(uint8_t code) {
+	switch (code)
+	{
+	case 0x00:
+		cartMBC = MBC::NONE;
+		printf("MBC - NONE\n");
+		return true;
+	case 0x01:
+		cartMBC = MBC::MBC1;
+		printf("MBC - MBC1\n");
+		return true;
+	default:
+		return false;
+	}
+}
+bool gbMEM::setBanks(uint8_t code) {
+	banks = pow(2, code+1);
+	return true;
 }

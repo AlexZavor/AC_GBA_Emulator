@@ -14,6 +14,18 @@ class gbMEM{
         char* cartrage;
         char* ram;
 
+        typedef enum{
+		NONE,
+		MBC1,
+		MBC2,
+		MBC5,
+	    }MBC;
+
+        MBC cartMBC;
+        bool RAMEnabled;
+        int8_t bank;
+        int8_t banks;
+
     public:
         gbMEM();
         // read with cartrage operations
@@ -31,6 +43,10 @@ class gbMEM{
     private:
         // initalize starting memory (mostly from nintendo logo)
         void initMem();
+        // Load what MBC the cartrage is
+        bool setMBC(uint8_t code);
+        // Set number of banks from code
+        bool setBanks(uint8_t code);
 };
 
 #endif /* GBMEM_H */
