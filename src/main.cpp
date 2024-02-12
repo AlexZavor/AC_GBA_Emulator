@@ -9,7 +9,7 @@
 #define SCREEN_WIDTH (160 * SCALE)
 #define SCREEN_HEIGHT (144 * SCALE)
 
-#define GAME "ROMS/DRMario.gb"
+#define GAME "ROMS/Tetris.gb"
 // #define GAME "ROMS/cpu_instrs.gb"
 // #define GAME "ROMS/07-jr,jp,call,ret,rst.gb"
 
@@ -30,6 +30,7 @@ bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 	if( *renderer == NULL ) {
 		printf( "Renderer could not be created! SDL Error: %s\n", SDL_GetError() );
 	}
+	SDL_RenderSetScale(*renderer, SCALE, SCALE);
 
 	return true;
 }
@@ -59,7 +60,6 @@ int main(int argc, char* argv[]) {
 	resetInputData(&input);
 
 	if(initializeSDL(&window, &renderer)){
-		SDL_RenderSetScale(renderer, SCALE, SCALE);
 		//main loop logic
 		bool quit = false;
 

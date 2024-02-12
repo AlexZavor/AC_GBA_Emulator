@@ -21,4 +21,4 @@ ROMS/
 SAVES/
 
 #Testing
-example.txt
+*.log

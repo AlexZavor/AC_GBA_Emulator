@@ -7,13 +7,13 @@ gbEmulator::gbEmulator(SDL_Renderer* renderer) {
 }
 
 void gbEmulator::runFrame(inputData input) {
-    MEM->MEM[0xFF00] = 0b11111111;
     for (uint8_t line = 0; line < 154; line++)
     {
         static int cyclecount = 0; 
-        cyclecount += 456;
+        cyclecount = 456;
         while (cyclecount > 0)
         {
+            MEM->MEM[0xFF00] |= 0x3F;
             // CPU->printInstruction();
             uint8_t cycles = CPU->instruction();
             cycles += CPU->interrupts(cycles);

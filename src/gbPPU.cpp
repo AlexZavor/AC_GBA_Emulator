@@ -10,6 +10,9 @@ gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend)
 void gbPPU::drawLine(uint8_t line)
 {
     dMEM[0xFF44] = line;
+	//Gameboy Doctor
+	
+    // dMEM[0xFF44] = 0x90;
 
 	if (line == 144) {
 		//turn on V-blank flag
@@ -132,7 +135,7 @@ void gbPPU::drawBackground() {
 			break;
 		}
 		// Vram[x][y] = pixel;
-        SDL_SetRenderDrawColor(renderer, pixel<<6, pixel<<6, pixel<<6, 0xFF);
+        SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
         SDL_RenderDrawPoint(renderer, x, y);
         // printf("%s\n",SDL_GetError());
 	}
@@ -191,7 +194,7 @@ void gbPPU::drawWindow() {
 		}
 		if ((x - (dMEM[0xFF4B] - 7) <= 160) && (x - (dMEM[0xFF4B] - 7) > 0) && (y - dMEM[0xFF4A] < 144) && (y - dMEM[0xFF4A] >= 0)) {
 			// Vram[x][y] = pixel;
-            SDL_SetRenderDrawColor(renderer, pixel<<6, pixel<<6, pixel<<6, 0xFF);
+            SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
             SDL_RenderDrawPoint(renderer, x, y);
 		}
 	}
@@ -262,7 +265,7 @@ void gbPPU::drawSprites() {bool size = 0;
 							break;
 						}
 						// Vram[X][Y] = pixel;
-                        SDL_SetRenderDrawColor(renderer, pixel<<6, pixel<<6, pixel<<6, 0xFF);
+                        SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
                         SDL_RenderDrawPoint(renderer, X, Y);
 					}
 				}

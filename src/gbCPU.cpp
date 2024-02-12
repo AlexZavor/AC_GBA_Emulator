@@ -1,7 +1,4 @@
 #include "gbCPU.h"
-#include <fstream>
-#include <iostream>
-std::ofstream myfile;
 
 #define ZMASK 0b10000000
 #define NMASK 0b01000000
@@ -4793,16 +4790,13 @@ int gbCPU::interrupts(int cycles) {
 }
 
 void gbCPU::initCpu() {
-	registers = { {0x00,0x00},{0x00,0x00},{0x00,0x00},{0x00,0x00},0xFFFE,0x0100 };
+	registers = { {0x00,0xB0},{0x00,0x13},{0x00,0xd8},{0x01,0x4d},0xFFFE,0x0100 };
 	IME = 0; //Interrupt Master Enable
 	preIME = 0; //used because IME only returns after one instruction
 	halted = 0; //Shows if the CPU is Halted
 	DMA = 0xE1;
 	DIV = 0x00;
 	lineprogress = 0;
-
-
-	myfile.open ("example.txt");
 }
 
 void gbCPU::PushStack(uint8_t data) {
@@ -4817,30 +4811,30 @@ uint8_t gbCPU::PopStack() {
 }
 
 void gbCPU::setZ(bool set) {
-    if (set) {
-        registers.f |= ZMASK;
-    }
-    else {
-        registers.f &= ~ZMASK;
-    }
+	if (set) {
+		registers.f |= 0b10000000;
+	}
+	else {
+		registers.f &= 0b01111111;
+	}
 }
 
 void gbCPU::setN(bool set) {
-    if (set) {
-        registers.f |= NMASK;
-    }
-    else {
-        registers.f &= ~NMASK;
-    }
+	if (set) {
+		registers.f |= 0b01000000;
+	}
+	else {
+		registers.f &= 0b10111111;
+	}
 }
 
 void gbCPU::setH(bool set) {
-    if (set) {
-        registers.f |= HMASK;
-    }
-    else {
-        registers.f &= ~HMASK;
-    }
+	if (set) {
+		registers.f |= 0b00100000;
+	}
+	else {
+		registers.f &= 0b11011111;
+	}
 }
 
 void gbCPU::setC(bool set) {
@@ -4891,8 +4885,9 @@ void gbCPU::Failure(int code) {switch (code) {
 
 void gbCPU::printInstruction()
 {
-    // printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
+    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
 	
-	myfile << std::hex << registers.pc << " - " ;
-	myfile << std::hex << (int)dMEM[registers.pc] << std::endl;
+	// myfile << std::hex << registers.pc << " - " << std::hex << (int)dMEM[registers.pc] << std::endl;
+
+	// printf("%X\n", dMEM[0xFF80]);
 }
