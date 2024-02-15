@@ -1,5 +1,4 @@
 #include "gbMEM.h"
-#include <math.h>
 /*
 Interrupt Enable Register
 --------------------------- FFFF
@@ -223,6 +222,8 @@ bool gbMEM::setMBC(uint8_t code) {
 	}
 }
 bool gbMEM::setBanks(uint8_t code) {
-	banks = pow(2, code+1);
+	banks = 0x0002;
+	banks = banks << (code);
+	printf("%d", banks);
 	return true;
 }

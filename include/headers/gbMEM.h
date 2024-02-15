@@ -23,8 +23,8 @@ class gbMEM{
 
         MBC cartMBC;
         bool RAMEnabled;
-        int8_t bank;
-        int8_t banks;
+        uint16_t bank;
+        uint16_t banks;
 
     public:
         gbMEM();

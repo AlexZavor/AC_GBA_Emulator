@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)
 project(GameBoyAdvanceEmulator  VERSION 1.0.0
         DESCRIPTION "C++ implemented emulator for the Game Boy Advance"
         LANGUAGES CXX)
-
+        
 set(DEBUG TRUE)
 
 link_directories(lib)
@@ -27,7 +27,7 @@ target_link_libraries(GBA SDL2main)
 target_link_libraries(GBA SDL2)
 
 if(DEBUG)
-    set(CMAKE_C_FLAGS "-Wall -DDEBUG")
+    set(CMAKE_CXX_FLAGS "-Wall -DDEBUG")
 else()
-    set(CMAKE_C_FLAGS "-Wl,-subsystem,windows")  
+    set(CMAKE_CXX_FLAGS "-Wl,-subsystem,windows")  
 endif()

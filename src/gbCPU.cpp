@@ -4675,7 +4675,7 @@ void gbCPU::timers(uint8_t clock) {
 	static uint32_t clkCount = 0;
 	if (dMEM[0xFF07] & 0b00000100) {
 		clkCount += clock;
-		int cycles = 0;
+		uint32_t cycles = 0;
 		switch (dMEM[0xFF07] & 0b00000011)
 		{
 		case 0:
@@ -4728,7 +4728,7 @@ int gbCPU::interrupts(int cycles) {
 			dMEM[0xFF0F] &= 0b11111110;
 			preIME = false;
 			halted = false;
-			IntCycles += 10;
+			IntCycles += 32;
 			PushStack(((registers.pc) & 0xFF00) >> 8);
 			PushStack((registers.pc) & 0x00FF);
 			registers.pc = 0x0040;
@@ -4738,7 +4738,7 @@ int gbCPU::interrupts(int cycles) {
 			dMEM[0xFF0F] &= 0b11111101;
 			preIME = false;
 			halted = false; 
-			IntCycles += 10;
+			IntCycles += 32;
 			PushStack(((registers.pc) & 0xFF00) >> 8);
 			PushStack((registers.pc) & 0x00FF);
 			registers.pc = 0x0048;
@@ -4748,7 +4748,7 @@ int gbCPU::interrupts(int cycles) {
 			dMEM[0xFF0F] &= 0b11111011;
 			preIME = false;
 			halted = false;
-			IntCycles += 10;
+			IntCycles += 32;
 			PushStack(((registers.pc) & 0xFF00) >> 8);
 			PushStack((registers.pc) & 0x00FF);
 			registers.pc = 0x0050;
