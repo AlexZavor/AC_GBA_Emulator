@@ -24,6 +24,7 @@ find_package(SDL2 REQUIRED)
 
 target_link_libraries(GBA mingw32)
 target_link_libraries(GBA SDL2main)
+target_link_libraries(GBA SDL2_ttf)
 target_link_libraries(GBA SDL2)
 
 if(DEBUG)

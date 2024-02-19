@@ -86,7 +86,7 @@ void gbMEM::write(uint16_t address, uint8_t data){
 				}if (banks < 4) {
 					bank &= 0b00000011;
 				}
-				printf("Bank swap - %d\n", bank);
+				// printf("Bank swap - %d\n", bank);
 				for (int byte = 0; byte < 0x4000; byte++)
 				{
 					MEM[0x4000 + byte] = cartrage[((long)bank * (long)0x4000) + byte];
@@ -224,6 +224,5 @@ bool gbMEM::setMBC(uint8_t code) {
 bool gbMEM::setBanks(uint8_t code) {
 	banks = 0x0002;
 	banks = banks << (code);
-	printf("%d", banks);
 	return true;
 }

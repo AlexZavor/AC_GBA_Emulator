@@ -3,6 +3,7 @@
 #include <vector>
 #include "tinydir.h"
 #include "SDL.h"
+#include "SDL_ttf.h"
 #include "inputData.h"
 #include "gbEmulator.h"
 
@@ -46,6 +47,8 @@ bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 	}
 	SDL_RenderSetScale(*renderer, SCALE, SCALE);
 
+	TTF_Init();
+
 	return true;
 }
 
@@ -59,6 +62,7 @@ bool closeSDL(SDL_Window* window, SDL_Renderer* renderer){
 		SDL_DestroyWindow( window );
 	}
 	//Quit SDL subsystems
+	TTF_Quit();
 	SDL_Quit();
 	return true;
 }
@@ -195,16 +199,37 @@ int main(int argc, char* argv[]) {
 				SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 				SDL_RenderClear(renderer);
 				SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+				static TTF_Font* Sans = TTF_OpenFont("../fonts/Minecraft.ttf", 16);
 				unsigned int y = 5;
 				for (unsigned int i = 0; i < 13;i++) {
 					if (i + (page * 13) < Roms.size()) {
-						// DrawString(10, y, Roms[i + (page * 13)]);
+						SDL_Color White = {255, 255, 255};
+
+						// as TTF_RenderText_Solid could only be used on
+						// SDL_Surface then you have to create the surface first
+						SDL_Surface* surfaceMessage =
+							TTF_RenderText_Solid(Sans, Roms[i + (page * 13)].c_str(), White); 
+
+						// now you can convert it into a texture
+						SDL_Texture* Message = SDL_CreateTextureFromSurface(renderer, surfaceMessage);
+
+						SDL_Rect Message_rect; //create a rect
+						Message_rect.x = 10;  //controls the rect's x coordinate 
+						Message_rect.y = y+2; // controls the rect's y coordinte
+						Message_rect.w = Roms[i + (page * 13)].length()*5; // controls the width of the rect
+						Message_rect.h = 8; // controls the height of the rect
+						SDL_RenderCopy(renderer, Message, NULL, &Message_rect);
+
+						// Don't forget to free your surface and texture
+						SDL_FreeSurface(surfaceMessage);
+						SDL_DestroyTexture(Message);
+
 					}
 					y += 10;
 				}
 
-				SDL_RenderDrawLine(renderer, 2, ((selection%13) * 10) + 7, 2, ((selection % 13) * 10) + 11);
-				SDL_RenderDrawPoint(renderer, 4, ((selection % 13) * 10) + 9);
+				SDL_RenderDrawLine(renderer, 2, ((selection%13) * 10) + 8, 2, ((selection % 13) * 10) + 11);
+				SDL_RenderDrawPoint(renderer, 4, ((selection % 13) * 10) + 10);
 				// FillTri(2, ((selection%13) * 10) + 7, 2, ((selection % 13) * 10) + 11, 4, ((selection % 13) * 10) + 9);
 
 				if (input.A || input.sel || input.start) {
