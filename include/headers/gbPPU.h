@@ -12,6 +12,8 @@ class gbPPU{
         uint8_t* dMEM;
         SDL_Renderer* renderer;
 
+        uint8_t currentLine[160];
+
     public:
         gbPPU(gbMEM* memory, SDL_Renderer* rend);
         void drawLine(uint8_t line);

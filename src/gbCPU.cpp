@@ -4705,15 +4705,18 @@ void gbCPU::timers(uint8_t clock) {
 
 int gbCPU::interrupts(int cycles) {
 	int IntCycles = 0; 
+
 	//OAM DMA Transfer
 	if (DMA != dMEM[0xFF46]) {
 		DMA = dMEM[0xFF46];
-		for (uint8_t byte = 0x00; byte < 0x9F; byte++) {
-			dMEM[0xFE00 + byte] = dMEM[(DMA << 8) + byte];
-		}
+		std::memcpy(dMEM + 0xFE00, dMEM + (DMA << 8), 0x9F);
+		// for (uint8_t byte = 0x00; byte < 0x9F; byte++) {
+		// 	dMEM[0xFE00 + byte] = dMEM[(DMA << 8) + byte];
+		// }
 		dMEM[0xFF46] = 0xE1;
 		DMA = 0xE1;
 	}
+
 	//DIV Register counting
 	if (dMEM[0xFF04] != DIV) {
 		DIV = 0x00;
@@ -4723,6 +4726,7 @@ int gbCPU::interrupts(int cycles) {
 		DIV+=cycles;
 		dMEM[0xFF04]+=cycles;
 	}
+
 	if (IME) {
 		if		(dMEM[0xFFFF] & 0b00000001 && dMEM[0xFF0F] & 0b00000001) {//Vblank
 			dMEM[0xFF0F] &= 0b11111110;
@@ -4780,12 +4784,14 @@ int gbCPU::interrupts(int cycles) {
 			Failure(4);
 		}
 	}
+
 	if (preIME != IME) {
 		IME = preIME;
 		if (IME) {
 			dMEM[0xFF0F] &= 0b11100000;
 		}
 	}
+	
 	return IntCycles;
 }
 

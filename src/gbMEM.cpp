@@ -87,10 +87,11 @@ void gbMEM::write(uint16_t address, uint8_t data){
 					bank &= 0b00000011;
 				}
 				// printf("Bank swap - %d\n", bank);
-				for (int byte = 0; byte < 0x4000; byte++)
-				{
-					MEM[0x4000 + byte] = cartrage[((long)bank * (long)0x4000) + byte];
-				}
+				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
+				// for (int byte = 0; byte < 0x4000; byte++)
+				// {
+				// 	MEM[0x4000 + byte] = cartrage[((long)bank * (long)0x4000) + byte];
+				// }
 			}
 			else if (address < 0x6000) {
 				//RAM Bank Number
@@ -141,9 +142,10 @@ std::streampos size;
 		file2.seekg(0, std::ios::beg);
 		file2.read(cartrage, size);
 		file2.close();
-		for (int d = 0; d < 0x8000; d++) {
-			MEM[d] = cartrage[d];
-		}
+		memcpy(MEM, cartrage, 0x8000);
+		// for (int d = 0; d < 0x8000; d++) {
+		// 	MEM[d] = cartrage[d];
+		// }
 		if (!setMBC(MEM[0x0147])) {
 			std::cout << "Unrecognized MBC - ";
 			printf("%.2X\n", MEM[0x0147]);

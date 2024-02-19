@@ -10,9 +10,6 @@ gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend)
 void gbPPU::drawLine(uint8_t line)
 {
     dMEM[0xFF44] = line;
-	//Gameboy Doctor
-	
-    // dMEM[0xFF44] = 0x90;
 
 	if (line == 144) {
 		//turn on V-blank flag
@@ -30,16 +27,6 @@ void gbPPU::drawLine(uint8_t line)
 		dMEM[0xFF41] &= 0b11111100;
 		dMEM[0xFF0F] &= 0b11111110;	//V-blank disable
 
-
-		//draw scan lines
-		//read two bytes per tile. write out to vram
-		/*for (int i = 0; i < 16; i += 1) {
-			for (int bit = 0; bit < 8; bit++) {
-				Vram[(i * 8) + bit][MEM[0xFF44]] = 
-					((MEM[0x9000 + (i*16) + (MEM[0xFF44]*2)] & (0b00000001 << (7 - bit)))>> (7 - bit)) +
-					(((MEM[0x9000 + (i*16) + (MEM[0xFF44] * 2) + 1] & (0b00000001 << (7 - bit)))*2)>> (7 - bit));
-			}
-		}*/
         if (dMEM[0xFF40] & 0b00000001) {
             //Background and Window Enable
             drawBackground();
@@ -137,6 +124,7 @@ void gbPPU::drawBackground() {
 		// Vram[x][y] = pixel;
         SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
         SDL_RenderDrawPoint(renderer, x, y);
+		currentLine[x] = pixel;
         // printf("%s\n",SDL_GetError());
 	}
 }
@@ -196,11 +184,13 @@ void gbPPU::drawWindow() {
 			// Vram[x][y] = pixel;
             SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
             SDL_RenderDrawPoint(renderer, x, y);
+			currentLine[x] = pixel;
 		}
 	}
 }
 
-void gbPPU::drawSprites() {bool size = 0;
+void gbPPU::drawSprites() {
+	bool size = 0;
 	if (dMEM[0xFF40] & 0b00000100) {
 		size = 1; //set sprite size to 8x16
 	}
@@ -249,7 +239,7 @@ void gbPPU::drawSprites() {bool size = 0;
 				uint8_t Y = ypos + r;
 				uint8_t X = xpos + bit;
 				if (Y >= 0 && Y < 144 && X >= 0 && X < 160) {
-					if ((!(flags & 0b10000000)) /*|| Vram[X][Y] == 0*/) {
+					if ((!(flags & 0b10000000)) || currentLine[X] == 0) {
 						switch (pixel)
 						{
 						case 1:
@@ -267,6 +257,7 @@ void gbPPU::drawSprites() {bool size = 0;
 						// Vram[X][Y] = pixel;
                         SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
                         SDL_RenderDrawPoint(renderer, X, Y);
+						currentLine[X] = pixel;
 					}
 				}
 			}

@@ -1,6 +1,7 @@
 #ifndef GBCPU_H
 #define GBCPU_H
 #include <stdint.h>
+#include <cstring>
 #include "gbMEM.h"
 
 struct reg {
