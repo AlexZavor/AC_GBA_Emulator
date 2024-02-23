@@ -133,13 +133,17 @@ int main(int argc, char* argv[]) {
 					switch( e.key.keysym.sym ) {
 						case KEY_UP:
 						input.up = 1;
-						if (input.up && selection > 0)	{ selection--; }
-						if (input.up && (selection % 13) == 12) { page--; }
+						if (selection > 0 && menu)	{ 
+							selection--; 
+							if ((selection % 13) == 12 && menu) { page--; }
+						}
 						break;
 						case KEY_DOWN:
 						input.down = 1;
-						if (input.down && selection < Roms.size()-1) { selection++; }
-						if (input.down && (selection%13) == 0) { page++; }
+						if (selection < Roms.size()-1 && menu) { 
+							selection++; 
+							if ((selection % 13) == 0 && menu) { page++; }
+						}
 						break;
 						case KEY_LEFT:
 						input.left = 1;
