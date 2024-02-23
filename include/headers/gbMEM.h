@@ -10,6 +10,7 @@
 class gbMEM{
     public:
         uint8_t MEM[0x10000];
+        bool flag = 0;
 
     private:
         char* cartrage;

@@ -1,5 +1,12 @@
 #include "gbCPU.h"
 
+// #define LOGFILE
+
+#ifdef LOGFILE
+#include <fstream>
+std::ofstream myfile;
+#endif
+
 #define ZMASK 0b10000000
 #define NMASK 0b01000000
 #define HMASK 0b00100000
@@ -12,148 +19,166 @@ gbCPU::gbCPU(gbMEM* memory) {
 }
 
 uint8_t gbCPU::instruction(){
-	#ifdef DEBUG
-		if(dMEM[0xFFFF] & 0b00000010){
-			// printInstruction();
-			// printf("stat wanted\n");
-		}
-	#endif
 	if(halted){
 		return 4;
 	}
+	uint8_t cycles = 0; 
+	
 	switch (dMEM[registers.pc]) {
 	case 0x00:      //NOP
 	{
+		cycles = 4;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x01:		//LD BC, nn
 	{
 		//load nn into BC
+		cycles = 12;
+		registers.bc = dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8);
 		registers.pc++;
-		registers.bc = dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8);
-		registers.pc += 2;//count past the two parameters
-		return 12;
+		registers.pc++;//count past the two parameters
+		registers.pc++;
+		break;
 	}
 	case 0x02:		//LD (BC), A
 	{
-		//Put A into MEM at BC
-		MEM->write(registers.bc, registers.a);
+		//Put A into memory at BC
+		cycles = 8;
+		dMEM[registers.bc] = registers.a;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x03:      //INC BC
 	{
 		//Increments Register BC by 1
+		cycles = 8;
 		registers.bc++;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x04:		//INC B
 	{
 		//increment register B
+		cycles = 4;
 		registers.b++;
-		registers.pc++;
 		setN(0);
-		setH(registers.b % 0x0F == 0);
+		setH(registers.b % 16 == 0);
+		registers.pc++;
 		setZ(!registers.b);
-		return 4;
+		break;
 	}
 	case 0x05:      //DEC B
 	{
 		//Decrement Register B
+		cycles = 4;
 		setN(1);
 		setH(!(registers.b & 0x0F));
 		registers.b--;
 		setZ(!registers.b);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x06:      //LD B, n
 	{
-		//load n into b
+	    //load n into b
+	    cycles = 8;
+		registers.b = dMEM[registers.pc + 1];
 		registers.pc++;//count past param
-		registers.b = dMEM[registers.pc];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x07:		//RLCA
 	{
 		//Rotate A (circular) left. old bit 7 into C;
-		registers.pc++;
-		setC(registers.a & 0x80);
-		registers.a = (registers.a & 0x7F) << 1;
-		registers.a += (registers.f & 0b00010000) >> 4;
-		setZ(0);
 		setN(0);
 		setH(0);
-		return 4;
+		setC(registers.a&0x80);
+		registers.a = (registers.a&0x7F)<<1;
+		registers.a += (registers.f&0b00010000) >> 4;
+		setZ(0);
+		registers.pc++;
+		cycles = 4;
+		break;
 	}
 	case 0x08:		//LD (nn),SP
 	{
-		//Put SP into MEM at adress nn
+		//Put SP into memory at adress nn
+		cycles = 20;
+		if (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8) > 0x8000) {//MEM Bank Stuff
+			dMEM[dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8)] = registers.sp & 0x00FF;
+			dMEM[dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8) + 1] = ((registers.sp & 0xFF00) >> 8);
+		}
+		else {
+			MEM->write(dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8) + 1, registers.sp & 0xFF00);
+		}
 		registers.pc++;
-		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8),      registers.sp & 0x00FF      );
-		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8) + 1, (registers.sp & 0xFF00 >> 8));
 		registers.pc++;//count past the two parameters
 		registers.pc++;
-		return 20;
+		break;
 	}
 	case 0x09:		//ADD HL, BC
 	{
 		//Add BC to HL
+		cycles = 8;
 		setN(0);
 		setC(((int)registers.bc + (int)registers.hl) > 65535);
 		setH(((registers.bc & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
 		registers.hl = registers.hl + registers.bc;
 		registers.pc++;
-		return 8;
+		break; 
 	}
 	case 0x0A:		//LD A, (BC)
 	{
 		//Load value at adress (BC) into A
+		cycles = 8;
 		registers.a = dMEM[registers.bc];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x0B:		//DEC BC
 	{
 		//decrement register BC
+		cycles = 8;
 		registers.bc--;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x0C:		//INC C
 	{
 		//increment register C
-		registers.pc++;
+		cycles = 4;
 		registers.c++;
 		setN(0);
 		setZ(!registers.c);
 		setH(registers.c % 16 == 0);
-		return 4;
+		registers.pc++;
+		break;
 	}
 	case 0x0D:      //DEC C
 	{
 		//Decrement Register c
+		cycles = 4;
 		setH(!(registers.c & 0x0F));
 		registers.c--;
 		setZ(!registers.c);
 		setN(1);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x0E:      //LD C, n
 	{
-		//load n into C
+	  //load n into C
+	  cycles = 8;
+		registers.c = dMEM[registers.pc + 1];
 		registers.pc++;//count past param
-		registers.c = dMEM[registers.pc];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x0F:		//RRCA
 	{
 		//Rotate A Right, old bit 0 into carry flag
+		cycles = 4;
 		setN(0);
 		setH(0);
 		uint8_t c = registers.a & 0b00000001;
@@ -162,69 +187,77 @@ uint8_t gbCPU::instruction(){
 		registers.a += (c << 7);
 		setZ(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x10:		//STOP
 	{
 		//Wait for Button Press
-		Failure(1);
+		//Failure(1);
+		cycles = 0;
 		registers.pc++;
-		return 1;
+		break;
 	}
 	case 0x11:		//LD DE, nn
 	{
 		//load nn into register DE
+		cycles = 12;
+		registers.de = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
 		registers.pc++;
-		registers.de = (dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8));
 		registers.pc++;//count past the two parameters
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0x12:		//LD (DE), A
 	{
 		//load A into the adress (DE)
-		MEM->write(registers.de, registers.a);
+		cycles = 12;
+		dMEM[registers.de] = registers.a;
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0x13:		//INC DE
 	{
 		//increment register DE
+		cycles = 8;
 		registers.de++;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x14:		//INC D
 	{
 		//increment register D
+		cycles = 4;
 		registers.d++;
 		setN(0);
 		setZ(!registers.d);
 		setH(registers.d % 16 == 0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x15:		//DEC D
 	{
 		//Decrement Register D
+		cycles = 4;
 		setH(!(registers.d & 0x0F));
 		registers.d--;
 		setZ(!registers.d);
 		setN(1);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x16:		//LD D, n
 	{
 		//load n into D
-		registers.pc++;
-		registers.d = dMEM[registers.pc];
+		cycles = 8;
+		registers.d = dMEM[registers.pc + 1];
 		registers.pc++;//count past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0x17:		//RLA
 	{
 		//Rotate A left through Carry Flag
+		cycles = 4;
 		setN(0);
 		setH(0);
 		bool n = (registers.f & 0b00010000);
@@ -233,7 +266,7 @@ uint8_t gbCPU::instruction(){
 		registers.a += n;
 		setZ(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x18:		//JR n
 	{
@@ -241,146 +274,162 @@ uint8_t gbCPU::instruction(){
 		registers.pc++;
 		registers.pc = registers.pc + ((signed char)dMEM[registers.pc]);
 		registers.pc++;
-		return 12;
+		cycles = 12;
+		break;
 	}
 	case 0x19:		//ADD HL, DE
 	{
 		//Add DE to HL
+		cycles = 8;
 		setN(0);
 		setC(((int)registers.de + (int)registers.hl) > 65535);
 		setH(((registers.de & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
 		registers.hl = registers.hl + registers.de;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x1A:		//LD A, (DE)
 	{
 		//Load value at (DE) into A
+		cycles = 8;
 		registers.a = dMEM[registers.de];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x1B:		//DEC DE
 	{
 		//decrement register DE
+		cycles = 8;
 		registers.de--;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x1C:		//INC E
 	{
 		//increment register E
+		cycles = 4;
 		registers.e++;
 		setN(0);
 		setH(registers.e % 16 == 0);
 		setZ(!registers.e);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x1D:		//DEC E
 	{
 		//Decrement Register E
+		cycles = 4;
 		setH(!(registers.e & 0x0F));
 		registers.e--;
 		setZ(!registers.e);
 		setN(1);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x1E:		//LD E, n
 	{
 		//load n into E
-		registers.pc++;
-		registers.e = dMEM[registers.pc];
+		cycles = 8;
+		registers.e = dMEM[registers.pc + 1];
 		registers.pc++;//count past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0x1F:		//RRA
 	{
 		//Rotate A Right through Carry Flag
+		cycles = 4;
 		setN(0);
 		setH(0);
 		bool n = (registers.f & 0b00010000);
 		setC(registers.a & 0x01);
 		registers.a = (registers.a & 0xFE) >> 1;
-		registers.a += ((int)n) << 7;
+		registers.a += ((int)n)<<7;
 		setZ(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x20:      //JR NZ, n
 	{
-		//jump to current address plus n if Zflag is reset 
+	  //jump to current address plus n if Zflag is reset 
 		if (!(registers.f & 0b10000000)) {
 			registers.pc++;
 			registers.pc = registers.pc + ((signed char)dMEM[registers.pc]); //forces twos complement and adjusts for counting past instruction
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0x21:      //LD HL, nn
 	{
-		//put value nn into HL, LSByte first
-		registers.pc++;
-		registers.hl = (dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8));
+	  //put value nn into HL, LSByte first
+	  cycles = 12;
+		registers.hl = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
 		registers.pc++;
 		registers.pc++;//count past the two parameters
-		return 12;
+		registers.pc++;
+		break;
 	}
 	case 0x22:		//LDI (HL), A
 	{
-		//put MEM in A into MEM adress HL, increment HL.
-		MEM->write(registers.hl, registers.a);
+		//put memory in A into memory adress HL, increment HL.
+		cycles = 8;
+		dMEM[registers.hl] = registers.a;
 		registers.hl++;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x23:		//INC HL
 	{
 		//increment register HL
+		cycles = 8;
 		registers.hl++;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x24:		//INC H
 	{
 		//increment register H
+		cycles = 4;
 		registers.h++;
 		setN(0);
 		setH(registers.h % 16 == 0);
 		setZ(!registers.h);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x25:		//DEC H
 	{
 		//Decrement Register H
+		cycles = 4;
 		setH(!(registers.h & 0x0F));
 		registers.h--;
 		setZ(!registers.h);
 		setN(1);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x26:      //LD H, n
 	{
 		//load n into H
-		registers.pc++;
-		registers.h = dMEM[registers.pc];
+		cycles = 8;
+		registers.h = dMEM[registers.pc + 1];
 		registers.pc++;//count past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0x27:		//DAA
 	{
 		//Decimal adjust register A
-		// Failure(0);
+		//Failure(0);
 		//TODO:: needs testing
-		if (!(registers.f & 0b01000000)) {  // after an addition, adjust if (half-)carry occurred or if result is out of bounds
+		cycles = 4;
+		if (!(registers.f&0b01000000)) {  // after an addition, adjust if (half-)carry occurred or if result is out of bounds
 			if ((registers.f & 0b00010000) || (registers.a > 0x99)) { registers.a += 0x60; setC(1); }
 			if ((registers.f & 0b00100000) || ((registers.a & 0x0f) > 0x09)) { registers.a += 0x6; }
 		}
@@ -392,7 +441,7 @@ uint8_t gbCPU::instruction(){
 		setZ(!(registers.a)); // the usual z flag
 		setH(0); // h flag is always cleared
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x28:		//JR Z, n
 	{
@@ -401,75 +450,82 @@ uint8_t gbCPU::instruction(){
 			registers.pc++;
 			registers.pc = registers.pc + ((signed char)dMEM[registers.pc]); //forces twos complement and adjusts for counting past instruction
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
-		return 4;
+		break;
 	}
 	case 0x29:		//ADD HL, HL
 	{
 		//Add HL to HL
+		cycles = 8;
 		setN(0);
 		setC(((int)registers.hl + (int)registers.hl) > 65535);
 		setH(((registers.hl & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
 		registers.hl = registers.hl + registers.hl;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x2A:		//LD A, (HL+)
 	{
 		//put value at Adress HL into A and increment HL;
-		registers.a = MEM->read(registers.hl);
+		cycles = 8;
+		registers.a = dMEM[registers.hl];
 		registers.hl++;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x2B:		//DEC HL
 	{
 		//decrement register HL
+		cycles = 8;
 		registers.hl--;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x2C:		//INC L
 	{
 		//increment register L
+		cycles = 4;
 		registers.l++;
 		setN(0);
 		setZ(!registers.l);
 		setH(registers.l % 16 == 0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x2D:		//DEC L
 	{
 		//Decrement Register L
+		cycles = 4;
 		setH(!(registers.l & 0x0F));
 		registers.l--;
 		setZ(!registers.l);
 		setN(1);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x2E:		//LD L, n
 	{
 		//load n into L
-		registers.pc++;
-		registers.l = dMEM[registers.pc];
+		cycles = 8;
+		registers.l = dMEM[registers.pc + 1];
 		registers.pc++;//count past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0x2F:		//CPL
 	{
 		//Complement A register (Flip all bits)
+		cycles = 4;
 		registers.f |= 0b01100000; //set N and H flags
 		registers.a = (-registers.a) - 1; //two's complement shenanigans
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x30:		//JR NC, n
 	{
@@ -478,698 +534,815 @@ uint8_t gbCPU::instruction(){
 			registers.pc++;
 			registers.pc = registers.pc + ((signed char)dMEM[registers.pc]); //forces twos complement and adjusts for counting past instruction
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
-		return 4;
+		break;
 	}
 	case 0x31:		//LD SP, nn
 	{
 		//set stack pointer to nn
-		registers.pc++;
-		registers.sp = dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8);
+		cycles = 12;
+		registers.sp = dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8);
 		registers.pc++;
 		registers.pc++;//count past the two parameters
-		return 12;
+		registers.pc++;
+		break;
 	}
 	case 0x32:      //LDD (HL), A
 	{
-		//load data(decrement) from A into (HL)
-		MEM->write(registers.hl, registers.a);
+	  //load data(decrement) from A into (HL)
+	  cycles = 8;
+		dMEM[registers.hl] = registers.a;
 		registers.hl--;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x33:		//INC SP
 	{
 		//increment register SP
+		cycles = 8;
 		registers.sp++;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x34:		//INC (HL)
 	{
 		//Increment data at adress HL
-		uint8_t hlData = MEM->read(registers.hl);
-		hlData++;
-		setZ(!hlData);
-		setH(hlData % 16 == 0);
+		cycles = 12;
+		(dMEM[registers.hl])++;
+		setZ(!(dMEM[registers.hl]));
+		setH(dMEM[registers.hl] % 16 == 0);
 		setN(0);
-		MEM->write(registers.hl, hlData);
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0x35:		//DEC (HL)
 	{
 		//Decrement data at adress HL
-		uint8_t hlData = MEM->read(registers.hl);
-		setH(!(hlData & 0x0F));
-		hlData--;
-		setZ(!hlData);
+		cycles = 12;
+		setH(!(dMEM[registers.hl] & 0x0F));
+		(dMEM[registers.hl])--;
+		setZ(!(dMEM[registers.hl]));
 		setN(1);
-		MEM->write(registers.hl, hlData);
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0x36:		//LD (HL), n
 	{
-		//Load n into MEM at (HL)
-		registers.pc++;
-		MEM->write(registers.hl, dMEM[registers.pc]);
+		//Load n into memory at (HL)
+		cycles = 12;
+		if (registers.hl > 0x8000) {//MEM Bank Stuff
+			dMEM[registers.hl] = dMEM[registers.pc + 1];
+		}
+		else {
+			MEM->write(registers.hl, dMEM[registers.pc + 1]);
+		}
 		registers.pc++;//count past param
-		return 12;
+		registers.pc++;
+		break;
 	}
 	case 0x37:		//SCF
 	{
 		//Set Carry flag
+		cycles = 4;
 		setN(0);
 		setH(0);
 		setC(1);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x38:		//JR C, n
 	{
 		//jump to current address plus n if Cflag is set 
-		if (registers.f & CMASK) {
+		if (registers.f & 0b00010000) {
 			registers.pc++;
 			registers.pc = registers.pc + ((signed char)dMEM[registers.pc]); //forces twos complement and adjusts for counting past instruction
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
-		return 4;
+		break; 
 	}
 	case 0x39:		//ADD HL, SP
 	{
 		//Add SP to HL
+		cycles = 8;
 		setN(0);
 		setC(((int)registers.sp + (int)registers.hl) > 65535);
 		setH(((registers.sp & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
 		registers.hl = registers.hl + registers.sp;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x3A:		//LD A, (HL-)
 	{
 		//put value at Adress HL into A and decrement HL;
-		registers.a = MEM->read(registers.hl);
+		cycles = 8;
+		registers.a = dMEM[registers.hl];
 		registers.hl--;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x3B:		//DEC SP
 	{
 		//decrement Stack Pointer
+		cycles = 8;
 		registers.sp--;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x3C:		//INC A
 	{
 		//Increment Register A
+		cycles = 4;
 		registers.a++;
 		setZ(!registers.a);
 		setH(registers.a % 16 == 0);
 		setN(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x3D:		//DEC A
 	{
 		//Decrement Register A
+		cycles = 4;
 		setH(!(registers.a & 0x0F));
 		registers.a--;
 		setZ(!registers.a);
 		setN(1);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x3E:      //LD A, n
 	{
-		//load n into A
-		registers.pc++;
-		registers.a = dMEM[registers.pc];
+	  //load n into A
+	  cycles = 8;
+		registers.a = dMEM[registers.pc + 1];
 		registers.pc++;//count past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0x3F:		//CCF
 	{
 		//Complement Carry Flag
+		cycles = 4;
 		setN(0);
 		setH(0);
-		setC(!(registers.f & 0b00010000));
+		setC(!(registers.f&0b00010000));
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x40:		//LD B, B
 	{
 		//Put value of register B into register B
+		cycles = 4;
 		//registers.b = registers.b;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x41:		//LD B, C
 	{
 		//Put value of register C into register B
+		cycles = 4;
 		registers.b = registers.c;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x42:		//LD B, D
 	{
 		//Put value of register D into register B
+		cycles = 4;
 		registers.b = registers.d;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x43:		//LD B, E
 	{
 		//Put value of register E into register B
+		cycles = 4;
 		registers.b = registers.e;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x44:		//LD B, H
 	{
 		//Put value of register H into register B
+		cycles = 4;
 		registers.b = registers.h;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x45:		//LD B, L
 	{
 		//Put value of register L into register B
+		cycles = 4;
 		registers.b = registers.l;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x46:		//LD B, (HL)
 	{
 		//put value at adress HL into register B
-		registers.b = MEM->read(registers.hl);
+		cycles = 8;
+		registers.b = dMEM[registers.hl];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x47:		//LD B, A
 	{
 		//Put value of register A into register B
+		cycles = 4;
 		registers.b = registers.a;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x48:		//LD C, B
 	{
 		//Put value of register B into register C
+		cycles = 4;
 		registers.c = registers.b;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x49:		//LD C, C
 	{
 		//Put value of register C into register C
+		cycles = 4;
 		//registers.c = registers.c;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x4A:		//LD C, D
 	{
 		//Put value of register D into register C
+		cycles = 4;
 		registers.c = registers.d;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x4B:		//LD C, E
 	{
 		//Put value of register E into register C
+		cycles = 4;
 		registers.c = registers.e;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x4C:		//LD C, H
 	{
 		//Put value of register H into register C
+		cycles = 4;
 		registers.c = registers.h;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x4D:		//LD C, L
 	{
 		//Put value of register L into register C
+		cycles = 4;
 		registers.c = registers.l;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x4E:		//LD C, (HL)
 	{
 		//put value at adress HL into register C
-		registers.c = MEM->read(registers.hl);
+		cycles = 8;
+		registers.c = dMEM[registers.hl];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x4F:		//LD C, A
 	{
 		//Put value of register A into register C
+		cycles = 4;
 		registers.c = registers.a;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x50:		//LD D, B
 	{
 		//Put value of register B into register D
+		cycles = 4;
 		registers.d = registers.b;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x51:		//LD D, C
 	{
 		//Put value of register C into register D
+		cycles = 4;
 		registers.d = registers.c;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x52:		//LD D, D
 	{
 		//Put value of register D into register D
+		cycles = 4;
 		//registers.d = registers.d;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x53:		//LD D, E
 	{
 		//Put value of register E into register D
+		cycles = 4;
 		registers.d = registers.e;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x54:		//LD D, H
 	{
 		//Put value of register H into register D
+		cycles = 4;
 		registers.d = registers.h;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x55:		//LD D, L
 	{
 		//Put value of register L into register D
+		cycles = 4;
 		registers.d = registers.l;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x56:		//LD D, (HL)
 	{
 		//put value at adress HL into register D
-		registers.d = MEM->read(registers.hl);
+		cycles = 8;
+		registers.d = dMEM[registers.hl];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x57:		//LD D, A
 	{
 		//Put value of register A into register D
+		cycles = 4;
 		registers.d = registers.a;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x58:		//LD E, B
 	{
 		//Put value of register B into register E
+		cycles = 4;
 		registers.e = registers.b;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x59:		//LD E, C
 	{
 		//Put value of register C into register E
+		cycles = 4;
 		registers.e = registers.c;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x5A:		//LD E, D
 	{
 		//Put value of register D into register E
+		cycles = 4;
 		registers.e = registers.d;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x5B:		//LD E, E
 	{
 		//Put value of register E into register E
+		cycles = 4;
 		//registers.e = registers.e;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x5C:		//LD E, H
 	{
 		//Put value of register H into register E
+		cycles = 4;
 		registers.e = registers.h;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x5D:		//LD E, L
 	{
 		//Put value of register L into register E
+		cycles = 4;
 		registers.e = registers.l;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x5E:		//LD E, (HL)
 	{
 		//put value at adress HL into register E
-		registers.e = MEM->read(registers.hl);
+		cycles = 8;
+		registers.e = dMEM[registers.hl];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x5F:		//LD E, A
 	{
 		//Put value of register A into register E
+		cycles = 4;
 		registers.e = registers.a;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x60:		//LD H, B
 	{
 		//Put value of register B into register H
+		cycles = 4;
 		registers.h = registers.b;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x61:		//LD H, C
 	{
 		//Put value of register C into register H
+		cycles = 4;
 		registers.h = registers.c;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x62:		//LD H, D
 	{
 		//Put value of register D into register H
+		cycles = 4;
 		registers.h = registers.d;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x63:		//LD H, E
 	{
 		//Put value of register E into register H
+		cycles = 4;
 		registers.h = registers.e;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x64:		//LD H, H
 	{
 		//Put value of register H into register H
+		cycles = 4;
 		//registers.h = registers.h;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x65:		//LD H, L
 	{
 		//Put value of register L into register H
+		cycles = 4;
 		registers.h = registers.l;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x66:		//LD H, (HL)
 	{
 		//put value at adress HL into register H
-		registers.h = MEM->read(registers.hl);
+		cycles = 8;
+		registers.h = dMEM[registers.hl];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x67:		//LD H, A
 	{
 		//Put value of register A into register H
+		cycles = 4;
 		registers.h = registers.a;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x68:		//LD L, B
 	{
 		//Put value of register B into register L
+		cycles = 4;
 		registers.l = registers.b;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x69:		//LD L, C
 	{
 		//Put value of register C into register L
+		cycles = 4;
 		registers.l = registers.c;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x6A:		//LD L, D
 	{
 		//Put value of register D into register L
+		cycles = 4;
 		registers.l = registers.d;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x6B:		//LD L, E
 	{
 		//Put value of register E into register L
+		cycles = 4;
 		registers.l = registers.e;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x6C:		//LD L, H
 	{
 		//Put value of register H into register L
+		cycles = 4;
 		registers.l = registers.h;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x6D:		//LD L, L
 	{
 		//Put value of register L into register L
+		cycles = 4;
 		//registers.l = registers.l;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x6E:		//LD L, (HL)
 	{
 		//put value at adress HL into register L
-		registers.l = MEM->read(registers.hl);
+		cycles = 8;
+		registers.l = dMEM[registers.hl];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x6F:		//LD L, A
 	{
 		//Put value of register A into register L
+		cycles = 4;
 		registers.l = registers.a;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x70:		//LD (HL), B
 	{
-		//Put value of register B into MEM at (HL)
-		MEM->write(registers.hl, registers.b);
+		//Put value of register B into memory at (HL)
+		cycles = 8;
+		if (registers.hl > 0x8000) {//MEM Bank Stuff
+			dMEM[registers.hl] = registers.b;
+		}
+		else {
+			MEM->write(registers.hl, registers.b);
+		}
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x71:		//LD (HL), C
 	{
-		//Put value of register C into MEM at (HL)
-		MEM->write(registers.hl, registers.c);
+		//Put value of register C into memory at (HL)
+		cycles = 8;
+		if (registers.hl > 0x8000) {//MEM Bank Stuff
+			dMEM[registers.hl] = registers.c;
+		}
+		else {
+			MEM->write(registers.hl, registers.c);
+		}
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x72:		//LD (HL), D
 	{
-		//Put value of register D into MEM at (HL)
-		MEM->write(registers.hl, registers.d);
+		//Put value of register D into memory at (HL)
+		cycles = 8;
+		if (registers.hl > 0x8000) {//MEM Bank Stuff
+			dMEM[registers.hl] = registers.d;
+		}
+		else {
+			MEM->write(registers.hl, registers.d);
+		}
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x73:		//LD (HL), E
 	{
-		//Put value of register E into MEM at (HL)
-		MEM->write(registers.hl, registers.e);
+		//Put value of register E into memory at (HL)
+		cycles = 8;
+		if (registers.hl > 0x8000) {//MEM Bank Stuff
+			dMEM[registers.hl] = registers.e;
+		}
+		else {
+			MEM->write(registers.hl, registers.e);
+		}
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x74:		//LD (HL), H
 	{
-		//Put value of register H into MEM at (HL)
-		MEM->write(registers.hl, registers.h);
+		//Put value of register H into memory at (HL)
+		cycles = 8;
+		if (registers.hl > 0x8000) {//MEM Bank Stuff
+			dMEM[registers.hl] = registers.h;
+		}
+		else {
+			MEM->write(registers.hl, registers.h);
+		}
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x75:		//LD (HL), L
 	{
-		//Put value of register L into MEM at (HL)
-		MEM->write(registers.hl, registers.l);
+		//Put value of register L into memory at (HL)
+		cycles = 8;
+		if (registers.hl > 0x8000) {//MEM Bank Stuff
+			dMEM[registers.hl] = registers.l;
+		}
+		else {
+			MEM->write(registers.hl, registers.l);
+		}
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x76:		//HALT
 	{
 		//Stop!
+		cycles = 4;
 		registers.pc++;
 		halted = true;
-		// Failure(3);
-		return 4;
+		//Failure(3);
+		break;
 	}
 	case 0x77:		//LD (HL), A
 	{
-		//Put register A into MEM at adress HL
-		MEM->write(registers.hl, registers.a);
+		//Put register A into memory at adress HL
+		cycles = 8;
+		dMEM[registers.hl] = registers.a;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x78:		//LD A, B
 	{
 		//Put value of register B into register A
+		cycles = 4;
 		registers.a = registers.b;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x79:		//LD A, C
 	{
 		//Put value of register C into register A
+		cycles = 4;
 		registers.a = registers.c;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x7A:		//LD A, D
 	{
 		//Put value of register D into register A
+		cycles = 4;
 		registers.a = registers.d;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x7B:		//LD A, E
 	{
 		//Put value of register E into register A
+		cycles = 4;
 		registers.a = registers.e;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x7C:		//LD A, H
 	{
 		//Put value of register H into register A
+		cycles = 4;
 		registers.a = registers.h;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x7D:		//LD A, L
 	{
 		//Put value of register L into register A
+		cycles = 4;
 		registers.a = registers.l;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x7E:		//LD A, (HL)
 	{
 		//Put value at adress (HL) into register A
-		registers.a = MEM->read(registers.hl);
+		cycles = 8;
+		registers.a = dMEM[registers.hl];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x7F:		//LD A, A
 	{
 		//Put value of register A into register A
+		cycles = 4;
 		registers.a = registers.a;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x80:		//ADD A, B
 	{
 		//Add B to A
+		cycles = 4;
 		setN(0);
-		setC(((int)registers.b + (int)registers.a) > 255);
-		setH(((registers.b & 0x0F) + (registers.a & 0x0F)) > 15);
+		setC(((int)registers.b + (int)registers.a)>255);
+		setH(((registers.b & 0x0F) + (registers.a & 0x0F))>15);
 		registers.a = registers.a + registers.b;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x81:		//ADD A, C
 	{
 		//Add C to A
+		cycles = 4;
 		setN(0);
 		setC(((int)registers.c + (int)registers.a) > 255);
 		setH(((registers.c & 0x0F) + (registers.a & 0x0F)) > 15);
 		registers.a = registers.a + registers.c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x82:		//ADD A, D
 	{
 		//Add D to A
+		cycles = 4;
 		setN(0);
 		setC(((int)registers.d + (int)registers.a) > 255);
 		setH(((registers.d & 0x0F) + (registers.a & 0x0F)) > 15);
 		registers.a = registers.a + registers.d;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x83:		//ADD A, E
 	{
 		//Add E to A
+		cycles = 4;
 		setN(0);
 		setC(((int)registers.e + (int)registers.a) > 255);
 		setH(((registers.e & 0x0F) + (registers.a & 0x0F)) > 15);
 		registers.a = registers.a + registers.e;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x84:		//ADD A, H
 	{
 		//Add H to A
+		cycles = 4;
 		setN(0);
 		setC(((int)registers.h + (int)registers.a) > 255);
 		setH(((registers.h & 0x0F) + (registers.a & 0x0F)) > 15);
 		registers.a = registers.a + registers.h;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x85:		//ADD A, L
 	{
 		//Add L to A
+		cycles = 4;
 		setN(0);
 		setC(((int)registers.l + (int)registers.a) > 255);
 		setH(((registers.l & 0x0F) + (registers.a & 0x0F)) > 15);
 		registers.a = registers.a + registers.l;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x86:		//ADD A, (HL)
 	{
 		//Add data in (HL) to A
-		uint8_t hlData = MEM->read(registers.hl);
+		cycles = 8;
 		setN(0);
-		setC(((int)hlData + (int)registers.a) > 255);
-		setH(((hlData & 0x0F) + (registers.a & 0x0F)) > 15);
-		registers.a = registers.a + hlData;
+		setC(((int)dMEM[registers.hl] + (int)registers.a) > 255);
+		setH(((dMEM[registers.hl] & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a = registers.a + dMEM[registers.hl];
 		setZ(!registers.a);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x87:		//ADD A, A
 	{
 		//Add A to A
+		cycles = 4;
 		setN(0);
 		setC(registers.a >= 128);
 		setH((registers.a & 0x0F) >= 8);
 		registers.a = registers.a + registers.a;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x88:		//ADC A, b
 	{
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
 		setC(((int)c + (int)registers.a + (int)registers.b) > 255);
@@ -1177,10 +1350,11 @@ uint8_t gbCPU::instruction(){
 		registers.a = registers.a + registers.b + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x89:		//ADC A, C
 	{
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
 		setC(((int)c + (int)registers.a + (int)registers.c) > 255);
@@ -1188,10 +1362,11 @@ uint8_t gbCPU::instruction(){
 		registers.a = registers.a + registers.c + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x8A:		//ADC A, D
 	{
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
 		setC(((int)c + (int)registers.a + (int)registers.d) > 255);
@@ -1199,10 +1374,11 @@ uint8_t gbCPU::instruction(){
 		registers.a = registers.a + registers.d + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x8B:		//ADC A, E
 	{
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
 		setC(((int)c + (int)registers.a + (int)registers.e) > 255);
@@ -1210,10 +1386,11 @@ uint8_t gbCPU::instruction(){
 		registers.a = registers.a + registers.e + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x8C:		//ADC A, H
 	{
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
 		setC(((int)c + (int)registers.a + (int)registers.h) > 255);
@@ -1221,10 +1398,11 @@ uint8_t gbCPU::instruction(){
 		registers.a = registers.a + registers.h + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x8D:		//ADC A, L
 	{
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
 		setC(((int)c + (int)registers.a + (int)registers.l) > 255);
@@ -1232,22 +1410,23 @@ uint8_t gbCPU::instruction(){
 		registers.a = registers.a + registers.l + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x8E:		//ADC A, (HL)
 	{
-		uint8_t hlData = MEM->read(registers.hl);
+		cycles = 8;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
-		setC(((int)c + (int)registers.a + (int)hlData) > 255);
-		setH(((hlData & 0x0F) + (registers.a & 0x0F) + c) > 15);
-		registers.a = registers.a + hlData + c;
+		setC(((int)c + (int)registers.a + (int)dMEM[registers.hl]) > 255);
+		setH(((dMEM[registers.hl] & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a = registers.a + dMEM[registers.hl] + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x8F:		//ADC A, A
 	{
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
 		setC(((int)c + (int)registers.a + (int)registers.a) > 255);
@@ -1255,196 +1434,211 @@ uint8_t gbCPU::instruction(){
 		registers.a = registers.a + registers.a + c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x90:      //SUB B
 	{
 		//Subtract B from A
+		cycles = 4;
 		setN(1);
 		setC(registers.b > registers.a);
 		setH((registers.b & 0x0F) > (registers.a & 0x0F));
 		registers.a = registers.a - registers.b;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x91:      //SUB C
 	{
 		//Subtract C from A
+		cycles = 4;
 		setN(1);
 		setC(registers.c > registers.a);
 		setH((registers.c & 0x0F) > (registers.a & 0x0F));
 		registers.a = registers.a - registers.c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x92:      //SUB D
 	{
 		//Subtract D from A
+		cycles = 4;
 		setN(1);
 		setC(registers.d > registers.a);
 		setH((registers.d & 0x0F) > (registers.a & 0x0F));
 		registers.a = registers.a - registers.d;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x93:      //SUB E
 	{
 		//Subtract E from A
+		cycles = 4;
 		setN(1);
 		setC(registers.e > registers.a);
 		setH((registers.e & 0x0F) > (registers.a & 0x0F));
 		registers.a = registers.a - registers.e;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x94:      //SUB H
 	{
 		//Subtract H from A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.h > registers.a);
 		setH((registers.h & 0x0F) > (registers.a & 0x0F));
 		registers.a = registers.a - registers.h;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x95:		//SUB L
 	{
 		//Subtract L from A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.l > registers.a);
 		setH((registers.l & 0x0F) > (registers.a & 0x0F));
 		registers.a = registers.a - registers.l;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x96:		//SUB (HL)
 	{
 		//Subtract Data at HL from A
-		uint8_t hlData = MEM->read(registers.hl);
+		cycles = 4;
 		setN(1); //set N flag
-		setC(hlData > registers.a);
-		setH((hlData & 0x0F) > (registers.a & 0x0F));
-		registers.a = registers.a - hlData;
+		setC(dMEM[registers.hl] > registers.a);
+		setH((dMEM[registers.hl] & 0x0F) > (registers.a & 0x0F));
+		registers.a = registers.a - dMEM[registers.hl];
 		setZ(!registers.a);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x97:		//SUB A
 	{
 		//Subtract A from A
+		cycles = 4;
 		setN(1); //set N flag
 		setZ(1);
 		setC(0);
 		setH(0);
 		registers.a = 0x00;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x98:		//SBC A, B
 	{
 		//Subtract B + Cflag from A
+		cycles = 4;
 		bool c = (registers.f & 0b00010000);
 		setN(1); //set N flag
 		setC(((int)c + (int)registers.b) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (registers.b & 0x0F) - c) & 0x10);
+		setH(((registers.a & 0x0F) - (registers.b & 0xf) - (c & 0x0F)) & 0x10);
 		registers.a = registers.a - (registers.b + c);
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x99:		//SBC A, C
 	{
 		//Subtract C + Cflag from A
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(1); //set N flag
 		setC(((int)c + (int)registers.c) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (registers.c & 0x0F) - c) & 0x10);
+		setH(((registers.a & 0x0F) - (registers.c & 0xf) - (c & 0x0F)) & 0x10);
 		registers.a = registers.a - registers.c - c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x9A:		//SBC A, D
 	{
 		//Subtract D + Cflag from A
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(1); //set N flag
 		setC(((int)c + (int)registers.d) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (registers.d & 0x0F) - c) & 0x10);
+		setH(((registers.a & 0x0F) - (registers.d & 0xf) - (c & 0x0F)) & 0x10);
 		registers.a = registers.a - registers.d - c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x9B:		//SBC A, E
 	{
 		//Subtract E + Cflag from A
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(1); //set N flag
 		setC(((int)c + (int)registers.e) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (registers.e & 0x0F) - c) & 0x10);
+		setH(((registers.a & 0x0F) - (registers.e & 0xf) - (c & 0x0F)) & 0x10);
 		registers.a = registers.a - registers.e - c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x9C:		//SBC A, H
 	{
 		//Subtract H + Cflag from A
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(1); //set N flag
 		setC(((int)c + (int)registers.h) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (registers.h & 0x0F) - c) & 0x10);
+		setH(((registers.a & 0x0F) - (registers.h & 0xf) - (c & 0x0F)) & 0x10);
 		registers.a = registers.a - registers.h - c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x9D:		//SBC A, L
 	{
 		//Subtract L + Cflag from A
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(1); //set N flag
 		setC(((int)c + (int)registers.l) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (registers.l & 0x0F) - c) & 0x10);
+		setH(((registers.a & 0x0F) - (registers.l & 0xf) - (c & 0x0F)) & 0x10);
 		registers.a = registers.a - registers.l - c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0x9E:		//SBC A, (HL)
 	{
 		//Subtract data at HL + Cflag from A
-		uint8_t hlData = MEM->read(registers.hl);
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(1); //set N flag
-		setC(((int)c + (int)hlData) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (hlData & 0x0F) - c) & 0x10);
-		registers.a = registers.a - hlData - c;
+		setC(((int)c + (int)dMEM[registers.hl]) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (dMEM[registers.hl] & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a = registers.a - dMEM[registers.hl] - c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0x9F:		//SBC A, A
 	{
 		//Subtract A + Cflag from A
+		cycles = 4;
 		bool c = (registers.f & 0b00010000);
 		setN(1); //set N flag
-		setH(((registers.a & 0x0F) - (registers.a & 0x0F) - c) & 0x10);
-		registers.a = !c;
+		setH(((registers.a & 0x0F) - (registers.a & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a = - c;
 		setZ(!registers.a);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA0:		//AND B
 	{
 		//Logically AND B with A, place result in A
+		cycles = 4;
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.a = registers.a & registers.b;
 		setZ(!registers.a);
@@ -1452,11 +1646,12 @@ uint8_t gbCPU::instruction(){
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA1:		//AND C
 	{
 		//Logically AND C with A, place result in A
+		cycles = 4;
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.a = registers.a & registers.c;
 		setZ(!registers.a);
@@ -1464,11 +1659,12 @@ uint8_t gbCPU::instruction(){
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA2:		//AND D
 	{
 		//Logically AND D with A, place result in A
+		cycles = 4;
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.a = registers.a & registers.d;
 		setZ(!registers.a);
@@ -1476,11 +1672,12 @@ uint8_t gbCPU::instruction(){
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA3:		//AND E
 	{
 		//Logically AND E with A, place result in A
+		cycles = 4;
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.a = registers.a & registers.e;
 		setZ(!registers.a);
@@ -1488,11 +1685,12 @@ uint8_t gbCPU::instruction(){
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA4:		//AND H
 	{
 		//Logically AND H with A, place result in A
+		cycles = 4;
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.a = registers.a & registers.h;
 		setZ(!registers.a);
@@ -1500,11 +1698,12 @@ uint8_t gbCPU::instruction(){
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA5:		//AND L
 	{
 		//Logically AND L with A, place result in A
+		cycles = 4;
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.a = registers.a & registers.l;
 		setZ(!registers.a);
@@ -1512,23 +1711,25 @@ uint8_t gbCPU::instruction(){
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA6:		//AND (HL)
 	{
 		//Logically AND (HL) with A, place result in A
+		cycles = 8;
 		registers.f = 0b00100000;//reset N, set H, reset C
-		registers.a = registers.a & MEM->read(registers.hl);
+		registers.a = registers.a & dMEM[registers.hl];
 		setZ(!registers.a);
 		setN(0);
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0xA7:		//AND A
 	{
 		//Logically AND A with A, place result in A
+		cycles = 4;
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.a = registers.a & registers.a;
 		setZ(!registers.a);
@@ -1536,11 +1737,12 @@ uint8_t gbCPU::instruction(){
 		setH(1);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA8:		//XOR B
 	{
 		//logical XOR between A and B.
+		cycles = 4;
 		registers.a = registers.a ^ registers.b;
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
@@ -1548,11 +1750,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xA9:		//XOR C
 	{
 		//logical XOR between A and C.
+		cycles = 4;
 		registers.a = registers.a ^ registers.c;
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
@@ -1560,11 +1763,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xAA:		//XOR D
 	{
 		//logical XOR between A and D.
+		cycles = 4;
 		registers.a = registers.a ^ registers.d;
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
@@ -1572,11 +1776,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xAB:		//XOR E
 	{
 		//logical XOR between A and E.
+		cycles = 4;
 		registers.a = registers.a ^ registers.e;
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
@@ -1584,11 +1789,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xAC:		//XOR H
 	{
 		//logical XOR between A and H.
+		cycles = 4;
 		registers.a = registers.a ^ registers.h;
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
@@ -1596,11 +1802,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xAD:		//XOR L
 	{
 		//logical XOR between A and L.
+		cycles = 4;
 		registers.a = registers.a ^ registers.l;
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
@@ -1608,31 +1815,34 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xAE:		//XOR (HL)
 	{
 		//logical XOR between A and (HL).
-		registers.a = registers.a ^ MEM->read(registers.hl);
+		cycles = 4;
+		registers.a = registers.a ^ dMEM[registers.hl];
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
 		setN(0);
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0xAF:      //XOR A
 	{
-		//logical XOR between A and ... A. so 0 into A
+	  //logical XOR between A and ... A. so 0 into A
+	  cycles = 4;
 		registers.a = 0x00;
 		registers.f = 0b10000000; //set zero flag
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB0:		//OR B
 	{
 		//Logical OR Register B with Register A, place result in A
+		cycles = 4;
 		registers.a = registers.a | registers.b;
 		registers.f = 0;
 		setZ(!registers.a);
@@ -1640,11 +1850,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB1:		//OR C
 	{
 		//Logical OR Register C with Register A, place result in A
+		cycles = 4;
 		registers.a = registers.a | registers.c;
 		registers.f = 0;
 		setZ(!registers.a);
@@ -1652,11 +1863,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB2:		//OR D
 	{
 		//Logical OR Register D with Register A, place result in A
+		cycles = 4;
 		registers.a = registers.a | registers.d;
 		registers.f = 0;
 		setZ(!registers.a);
@@ -1664,11 +1876,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB3:		//OR E
 	{
 		//Logical OR Register E with Register A, place result in A
+		cycles = 4;
 		registers.a = registers.a | registers.e;
 		registers.f = 0;
 		setZ(!registers.a);
@@ -1676,11 +1889,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB4:		//OR H
 	{
 		//Logical OR Register H with Register A, place result in A
+		cycles = 4;
 		registers.a = registers.a | registers.h;
 		registers.f = 0;
 		setZ(!registers.a);
@@ -1688,11 +1902,12 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB5:		//OR L
 	{
 		//Logical OR Register L with Register A, place result in A
+		cycles = 4;
 		registers.a = registers.a | registers.l;
 		registers.f = 0;
 		setZ(!registers.a);
@@ -1700,23 +1915,25 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB6:		//OR (HL)
 	{
 		//Logical OR data at HL with Register A, place result in A
-		registers.a = registers.a | MEM->read(registers.hl);
+		cycles = 4;
+		registers.a = registers.a | dMEM[registers.hl];
 		registers.f = 0;
 		setZ(!registers.a);
 		setN(0);
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0xB7:		//OR A
 	{
 		//Logical OR Register A with Register A, place result in A
+		cycles = 4;
 		//registers.a = registers.a | registers.a;
 		registers.f = 0;
 		setZ(!registers.a);
@@ -1724,128 +1941,138 @@ uint8_t gbCPU::instruction(){
 		setH(0);
 		setC(0);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB8:		//CP B
 	{
 		//compare data in B to A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.b > registers.a);
 		setH((registers.b & 0x0F) > (registers.a & 0x0F));
 		setZ(registers.a == registers.b);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xB9:		//CP C
 	{
 		//compare data in C to A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.c > registers.a);
 		setH((registers.c & 0x0F) > (registers.a & 0x0F));
 		setZ(registers.a == registers.c);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xBA:		//CP D
 	{
 		//compare data in D to A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.d > registers.a);
 		setH((registers.d & 0x0F) > (registers.a & 0x0F));
 		setZ(registers.a == registers.d);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xBB:		//CP E
 	{
 		//compare data in E to A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.e > registers.a);
 		setH((registers.e & 0x0F) > (registers.a & 0x0F));
 		setZ(registers.a == registers.e);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xBC:		//CP H
 	{
 		//compare data in H to A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.h > registers.a);
 		setH((registers.h & 0x0F) > (registers.a & 0x0F));
 		setZ(registers.a == registers.h);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xBD:		//CP L
 	{
 		//compare data in L to A
+		cycles = 4;
 		setN(1); //set N flag
 		setC(registers.l > registers.a);
 		setH((registers.l & 0x0F) > (registers.a & 0x0F));
 		setZ(registers.a == registers.l);
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xBE:		//CP (HL)
 	{
 		//compare data at (HL) to A
-		uint8_t hlData = MEM->read(registers.hl);
+		cycles = 8;
 		setN(1); //set N flag
-		setC(hlData > registers.a);
-		setH((hlData & 0x0F) > (registers.a & 0x0F));
-		setZ(registers.a == hlData);
+		setC(dMEM[registers.hl] > registers.a);
+		setH((dMEM[registers.hl] & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == dMEM[registers.hl]);
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0xBF:		//CP A
 	{
 		//compare data in A to A
+		cycles = 4;
 		setZ(1); //set Z flag
 		setN(1); //set N flag
 		setH(0); //set H flag
 		setC(0); //set C flag
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xC0:		//RET NZ
 	{
 		//return if Zflag is reset
 		if (!(registers.f & 0b10000000)) {
-			int first = PopStack();
-			registers.pc = first + ((int)PopStack() << 8);
-			return 20;
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			cycles = 20;
 		}
 		else {
 			registers.pc++;//jump past parameter
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xC1:		//POP BC
 	{
+		cycles = 12;
 		registers.c = PopStack();
 		registers.b = PopStack();
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0xC2:		//JP NZ, nn
 	{
 		//jump to nn if Zflag is reset 
 		if (!(registers.f & 0b10000000)) {
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xC3:      //JP nn
 	{
 		//jump to adress nn (lsByte first)
+		cycles = 12;
 		registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-		return 12;
+		break;
 	}
 	case 0xC4:		//CALL NZ, nn
 	{
@@ -1854,84 +2081,90 @@ uint8_t gbCPU::instruction(){
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 24;
+			cycles = 24;
 		}
 		else {
 			registers.pc++;
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
+		break;
 	}
 	case 0xC5:		//PUSH BC
 	{
+		cycles = 16;
 		registers.pc++;
 		PushStack(registers.b);
 		PushStack(registers.c);
-		return 16;
+		break;
 	}
 	case 0xC6:		//ADD A, n
 	{
 		//Add n to A
+		cycles = 8;
 		setN(0);
-		registers.pc++;
-		setC(((int)dMEM[registers.pc] + (int)registers.a) > 255);
-		setH(((dMEM[registers.pc] & 0x0F) + (registers.a & 0x0F)) > 15);
-		registers.a = registers.a + dMEM[registers.pc];
+		setC(((int)dMEM[registers.pc+1] + (int)registers.a) > 255);
+		setH(((dMEM[registers.pc + 1] & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a = registers.a + dMEM[registers.pc + 1];
 		setZ(!registers.a);
 		registers.pc++; //jump past parameter
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0xC7:		//RST 00H
 	{
 		//Put next address on stack
 		//set PC on 0x0000
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0000;
-		return 32;
+		break;
 	}
 	case 0xC8:		//RET Z
 	{
 		//return if Zflag is set
 		if (registers.f & 0b10000000) {
-			int first = PopStack();
-			registers.pc = first + ((int)PopStack() << 8);
-			return 20;
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			cycles = 20;
 		}
 		else {
 			registers.pc++; //jump past parameter
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xC9:		//RET
 	{
 		//return from sub routine, pop two bytes off stack and jump to that adress;
-		int first = PopStack();
-		registers.pc = (first) + ((int)PopStack() << 8);
-		return 16;
+		cycles = 16;
+		registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+		break;
 	}
 	case 0xCA:		//JP Z, nn
 	{
 		//jump to nn if Zflag is set 
 		if (registers.f & 0b10000000) {
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xCB:		//THE GREAT AND TERRIFYING PREFIX
 	{
 		//run all the extra op codes with this prefix
 		registers.pc++;
-		return CBPrefix();
+		cycles = CBPrefix();
+		break;
 	}
 	case 0xCC:		//CALL Z, nn
 	{
@@ -1940,80 +2173,85 @@ uint8_t gbCPU::instruction(){
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 24;
+			cycles = 24;
 		}
 		else {
 			registers.pc++;
-			registers.pc++;//jump past parameters
+			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
-		return 4;
+		break;
 	}
 	case 0xCD:		//CALL (nn)
 	{
 		//push adress of next instruction onto stack and then jump to adress nn
+		cycles = 12;
 		PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 		PushStack((registers.pc + 3) & 0x00FF);
 		registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-		return 12;
+		break;
 	}
 	case 0xCE:		//ADC A, n
 	{
-		registers.pc++;
+		cycles = 8;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(0);
-		setC(((int)c + (int)registers.a + (int)dMEM[registers.pc]) > 255);
-		setH(((dMEM[registers.pc] & 0x0F) + (registers.a & 0x0F) + c) > 15);
-		registers.a = registers.a + dMEM[registers.pc] + c;
+		setC(((int)c + (int)registers.a + (int)dMEM[registers.pc + 1]) > 255);
+		setH(((dMEM[registers.pc + 1] & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a = registers.a + dMEM[registers.pc+1] + c;
 		setZ(!registers.a);
 		registers.pc++; //Increment past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0xCF:		//RST 08H
 	{
 		//Put next address on stack
 		//set PC on 0x0008
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0008;
-		return 32;
+		break;
 	}
 	case 0xD0:		//RET NC
 	{
 		//return if Cflag is reset
 		if (!(registers.f & 0b00010000)) {
-			int first = PopStack();
-			registers.pc = first + ((int)PopStack() << 8);
-			return 20;
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			cycles = 20;
 		}
 		else {
 			registers.pc++;//jump past parameter
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xD1:		//POP DE
 	{
+		cycles = 12;
 		registers.e = PopStack();
 		registers.d = PopStack();
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0xD2:		//JP NC, nn
 	{
 		//jump to nn if Cflag is reset 
 		if (!(registers.f & 0b00010000)) {
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xD3:		//NO INSTRUCTION
 	{
@@ -2027,81 +2265,85 @@ uint8_t gbCPU::instruction(){
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 24;
+			cycles = 24;
 		}
 		else {
 			registers.pc++;
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
+		break;
 	}
 	case 0xD5:		//PUSH DE
 	{
 		//push DE onto the stack
+		cycles = 16;
 		registers.pc++;
 		PushStack(registers.d);
 		PushStack(registers.e);
-		return 16;
+		break;
 	}
 	case 0xD6:      //SUB n
 	{
 		//Subtract n from A
-		registers.pc++;
+		cycles = 8;
 		setN(1);
-		setC(dMEM[registers.pc] > registers.a);
-		setH((dMEM[registers.pc] & 0x0F) > (registers.a & 0x0F));
-		registers.a = registers.a - dMEM[registers.pc];
+		setC(dMEM[registers.pc+1] > registers.a);
+		setH((dMEM[registers.pc + 1] & 0x0F) > (registers.a & 0x0F));
+		registers.a = registers.a - dMEM[registers.pc + 1];
 		setZ(!(registers.a));
 		registers.pc++;//Jump past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0xD7:		//RST 10H;
 	{
 		//Put next address on stack
 		//set PC on 0x0010
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0010;
-		return 32;
+		break;
 	}
 	case 0xD8:		//RET C
 	{
 		//return if Zflag is set
 		if (registers.f & 0b00010000) {
-			int first = PopStack();
-			registers.pc = first + ((int)PopStack() << 8);
-			return 20;
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			cycles = 20;
 		}
 		else {
-			registers.pc++;
-			return 8;
+			registers.pc++; //jump past parameter
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xD9:		//RETI
 	{
-		//return from Interrupt, pop two bytes off stack and jump to that adress. then re-enable interrupts
-		int first = PopStack();
-		registers.pc = first + ((int)PopStack() << 8);
+		//return from Interrupt, pop two bytes off stack and jump to that adress. then reinable interrupts
+		cycles = 16;
+		registers.pc = (int)PopStack() + ((int)PopStack() << 8);
 		preIME = 1;
-		//std::cout << "Return from interrupt";
-		return 16;
+		break;
 	}
 	case 0xDA:		//JP C, nn
 	{
 		//jump to nn if Cflag is set 
 		if (registers.f & 0b00010000) {
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 12;
+			cycles = 12;
 		}
 		else {
 			registers.pc++;
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 8;
+			cycles = 8;
 		}
+		break;
 	}
 	case 0xDB:		//NO INSTRUCTION
 	{
@@ -2115,15 +2357,15 @@ uint8_t gbCPU::instruction(){
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
 			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
-			return 24;
+			cycles = 24;
 		}
 		else {
 			registers.pc++;
 			registers.pc++;//jump past parameter
 			registers.pc++;
-			return 12;
+			cycles = 12;
 		}
-		return 4;
+		break;
 	}
 	case 0xDD:		//NO INSTRUCTION
 	{
@@ -2133,48 +2375,53 @@ uint8_t gbCPU::instruction(){
 	case 0xDE:		//SBC A, n
 	{
 		//Subtract n + Cflag from A
-		registers.pc++;
+		cycles = 4;
 		bool c = ((registers.f & 0b00010000) >> 4);
 		setN(1); //set N flag
-		setC(((int)c + (int)dMEM[registers.pc]) > (int)registers.a);
-		setH(((dMEM[registers.pc] & 0x0F) + c) > (registers.a & 0x0F));
-		registers.a = registers.a - dMEM[registers.pc] - c;
+		setC(((int)c + (int)dMEM[registers.pc+1]) > (int)registers.a);
+		setH(((dMEM[registers.pc + 1] & 0x0F) + c) > (registers.a & 0x0F));
+		registers.a = registers.a - dMEM[registers.pc + 1] - c;
 		setZ(!registers.a);
 		registers.pc++; // Increment past param
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0xDF:		//RST 18H;
 	{
 		//Put next address on stack
-		//set PC on 0x0018
+		//set PC on 0x0028
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0018;
-		return 32;
+		break;
 	}
 	case 0xE0:      //LDH (n), A
 	{
-		//put A into MEM adress $FF00(IOports) + n
-		registers.pc++;
-		dMEM[0xFF00 + dMEM[registers.pc]] = registers.a;
+	    //put A into memory adress $FF00(IOports) + n
+	    cycles = 12;      
+		dMEM[0xFF00 + dMEM[registers.pc + 1]] = registers.a;
 		registers.pc++;//increment past param
-		return 12;
+		registers.pc++;
+		break;
 	}
 	case 0xE1:		//POP HL
 	{
+		cycles = 12;
 		registers.l = PopStack();
 		registers.h = PopStack();
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0xE2:		//LD (C), A
 	{
 		//put register A into adress $FF00 + register C
+		cycles = 8;
 		dMEM[0xFF00 + registers.c] = registers.a;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0xE3:      //NO INSTRUCTION
 	{
@@ -2188,61 +2435,72 @@ uint8_t gbCPU::instruction(){
 	}
 	case 0xE5:		//PUSH HL
 	{
+		cycles = 16;
 		PushStack(registers.h);
 		PushStack(registers.l);
 		registers.pc++;
-		return 16;
+		break;
 	}
 	case 0xE6:		//AND n
 	{
 		//Logically AND n with A, place result in A
-		registers.pc++;
+		cycles = 8;
 		registers.f = 0b00100000;//reset N, set H, reset C
-		registers.a = registers.a & dMEM[registers.pc];
+		registers.a = registers.a & dMEM[registers.pc + 1];
 		setZ(!registers.a);
-		registers.pc++; // Inc past Parameter n
-		return 8;
+		registers.pc++;
+		registers.pc++;
+		break;
 	}
 	case 0xE7:		//RST 20H;
 	{
 		//Put next address on stack
 		//set PC on 0x0020
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0020;
-		return 32;
+		break;
 	}
 	case 0xE8:		//ADD SP, n
 	{
 		//Add n to SP
-		registers.pc++;
+		cycles = 16;
 		setZ(0);
 		setN(0);
-		signed char n = ((signed char)dMEM[registers.pc]);
+		signed char n = ((signed char)dMEM[registers.pc + 1]);
 		//setC(((int)registers.sp + n) > 0xFFFF || ((int)registers.sp + n) < 0x0);
 		setC(((registers.sp & 0xFF) + (n & 0xFF)) & 0x100);
 		setH(((registers.sp & 0x0F) + (n & 0x0F)) & 0x10);
 		//setH(((registers.a & 0x0F) - (registers.h & 0xf) - (c & 0x0F)) & 0x10);
 		registers.sp = registers.sp + n;
 		registers.pc++;
-		return 16;
+		registers.pc++;
+		break;
 	}
 	case 0xE9:		//JP HL
 	{
 		//jump to the adress in HL
+		cycles = 4;
 		registers.pc = registers.hl;
-		return 4;
+		break;
 	}
 	case 0xEA:		//LD (nn), A
 	{
 		//put A into (nn)
+		cycles = 16;
+		if (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8) > 0x8000) {//MEM Bank Stuff
+			dMEM[dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8)] = registers.a;
+		}
+		else {
+			MEM->write(dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8), registers.a);
+		}
 		registers.pc++;
-		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8), registers.a);
 		registers.pc++;//increment past params
 		registers.pc++;
-		return 16;
+		break;
 	}
 	case 0xEB:      //NO INSTRUCTION
 	{
@@ -2262,34 +2520,38 @@ uint8_t gbCPU::instruction(){
 	case 0xEE:		//XOR n
 	{
 		//logical XOR between A and n.
-		registers.pc++;
-		registers.a = registers.a ^ dMEM[registers.pc];
+		cycles = 4;
+		registers.a = registers.a ^ dMEM[registers.pc + 1];
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
-		registers.pc++;//inc past Param n
-		return 8;
+		registers.pc++;
+		registers.pc++;
+		break;
 	}
 	case 0xEF:		//RST 28H;
 	{
 		//Put next address on stack
 		//set PC on 0x0028
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0028;
-		return 32;
+		break;
 	}
 	case 0xF0:      //LDH A, n
 	{
-		//put MEM adress $FF00(IOports) + n into register A
-		registers.pc++;
-		registers.a = dMEM[0xFF00 + dMEM[registers.pc]];
+	  //put memory adress $FF00(IOports) + n into register A
+	  cycles = 12; 
+		registers.a = dMEM[0xFF00 + dMEM[registers.pc + 1]];
 		registers.pc++;//increment past param
-		return 12;
+		registers.pc++;
+		break;
 	}
 	case 0xF1:		//POP AF
 	{
+		cycles = 12;
 		uint8_t f = PopStack();
 		setZ(f & 0b10000000);
 		setN(f & 0b01000000);
@@ -2297,21 +2559,23 @@ uint8_t gbCPU::instruction(){
 		setC(f & 0b00010000);
 		registers.a = PopStack();
 		registers.pc++;
-		return 12;
+		break;
 	}
 	case 0xF2:		//LD A, (C)
 	{
 		//put $FF00 + register C into register A
+		cycles = 8;
 		registers.a = dMEM[0xFF00 + registers.c];
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0xF3:      //DI
 	{
 		//disable interupts after instruction is complete
+		cycles = 4;
 		preIME = 0;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xF4:		//NO INSTRUCTION
 	{
@@ -2320,69 +2584,76 @@ uint8_t gbCPU::instruction(){
 	}
 	case 0xF5:		//PUSH AF
 	{
+		cycles = 16;
 		registers.pc++;
 		PushStack(registers.a);
 		PushStack(registers.f);
-		return 16;
+		break;
 	}
 	case 0xF6:		//OR n
 	{
 		//Logically OR n with A, place result in A
-		registers.pc++;
+		cycles = 8;
 		registers.f = 0b00000000;//reset N, set H, reset C
-		registers.a = registers.a | dMEM[registers.pc];
+		registers.a = registers.a | dMEM[registers.pc + 1];
 		setZ(!registers.a);
 		registers.pc++; //jump past parameter
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0xF7:      //RST 30H
 	{
 		//Put current address on stack
 		//set PC on 0x0030
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0030;
-		return 32;
+		break;
 	}
 	case 0xF8:		//LD HL, SP + n
 	{
 		//load SP + n(signed) into HL
-		registers.pc++;
+		cycles = 12;
 		setZ(0);
 		setN(0);
-		signed char n = ((signed char)dMEM[registers.pc]);
+		signed char n = ((signed char)dMEM[registers.pc + 1]);
 		//setC(((int)registers.sp + n) > 0xFFFF || ((int)registers.sp + n) < 0x0);
 		setC(((registers.sp & 0xFF) + (n & 0xFF)) & 0x100);
 		setH(((registers.sp & 0x0F) + (n & 0x0F)) & 0x10);
-		//setC(((int)registers.sp + ((signed int)MEM[registers.pc])) > 0xFFFF);
-		//setH(((int)(registers.sp&0x0FFF) + ((signed int)(MEM[registers.pc]))) > 0x0FFF);
+		//setC(((int)registers.sp + ((signed int)dMEM[registers.pc])) > 0xFFFF);
+		//setH(((int)(registers.sp&0x0FFF) + ((signed int)(dMEM[registers.pc]))) > 0x0FFF);
 		registers.hl = registers.sp + n;
 		registers.pc++;
-		return 12;
+		registers.pc++;
+		break;
 	}
 	case 0xF9:		//LD SP, HL
 	{
+		cycles = 8;
 		registers.sp = registers.hl;
 		registers.pc++;
-		return 8;
+		break;
 	}
 	case 0xFA:		//LD A, (nn)
 	{
 		//Load value at the adress nn into A;
+		cycles = 16;
+		registers.a = dMEM[(dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8))];
 		registers.pc++;
-		registers.a = MEM->read(dMEM[registers.pc] + (dMEM[registers.pc + 2] << 8));
 		registers.pc++; //jump past params
 		registers.pc++;
-		return 16;
+		break;
 	}
 	case 0xFB:      //EI
 	{
 		//enable interupts after next instruction is complete
+		cycles = 4;
 		preIME = 1;
 		registers.pc++;
-		return 4;
+		break;
 	}
 	case 0xFC:		//NO INSTRUCTION
 	{
@@ -2396,34 +2667,37 @@ uint8_t gbCPU::instruction(){
 	}
 	case 0xFE:      //CP n
 	{
-		//Compare A with n
-		//like an A-n instruction but forget the result
-		registers.pc++;
-		uint8_t n = dMEM[registers.pc];
+	  //Compare A with n
+	  //like an A-n instruction but forget the result
+		cycles = 8;
+		uint8_t n = dMEM[registers.pc + 1];
 		setN(1);
 		setC(n > registers.a);
 		setH((n & 0x0F) > (registers.a & 0x0F));
 		setZ(n == registers.a);
 		registers.pc++;//jump past parameter
-		return 8;
+		registers.pc++;
+		break;
 	}
 	case 0xFF:      //RST 38H
 	{
-		//Put current address on stack
-		//set PC on 0x0038
+	  //Put current address on stack
+	  //set PC on 0x0038
+		cycles = 32;
 		registers.pc++;
 		PushStack((registers.pc & 0xFF00) >> 8);
 		PushStack(registers.pc & 0x00FF);
 		//TODO: Test this please
 		registers.pc = 0x0038;
-		return 32;
+		break;
 	}
 	default:
 	{
 		Failure(0);
-		return 0;
+		return 0; 
 	}
 	}
+	return cycles;
 }
 
 uint8_t gbCPU::CBPrefix() {
@@ -4723,8 +4997,8 @@ int gbCPU::interrupts(int cycles) {
 		dMEM[0xFF04] = 0x00;
 	}
 	else {
-		DIV+=cycles;
-		dMEM[0xFF04]+=cycles;
+		DIV+=cycles-1;
+		dMEM[0xFF04]+=cycles-1;
 	}
 
 	if (IME) {
@@ -4803,6 +5077,10 @@ void gbCPU::initCpu() {
 	DMA = 0xE1;
 	DIV = 0x00;
 	lineprogress = 0;
+
+	#ifdef LOGFILE
+  	myfile.open ("Debug.log");
+	#endif
 }
 
 void gbCPU::PushStack(uint8_t data) {
@@ -4818,37 +5096,37 @@ uint8_t gbCPU::PopStack() {
 
 void gbCPU::setZ(bool set) {
 	if (set) {
-		registers.f |= 0b10000000;
+		registers.f |= ZMASK;
 	}
 	else {
-		registers.f &= 0b01111111;
+		registers.f &= ~ZMASK;
 	}
 }
 
 void gbCPU::setN(bool set) {
 	if (set) {
-		registers.f |= 0b01000000;
+		registers.f |= NMASK;
 	}
 	else {
-		registers.f &= 0b10111111;
+		registers.f &= ~NMASK;
 	}
 }
 
 void gbCPU::setH(bool set) {
 	if (set) {
-		registers.f |= 0b00100000;
+		registers.f |= HMASK;
 	}
 	else {
-		registers.f &= 0b11011111;
+		registers.f &= ~HMASK;
 	}
 }
 
 void gbCPU::setC(bool set) {
     if (set) {
-        registers.f |= 0b00010000;
+        registers.f |= CMASK;
     }
     else {
-        registers.f &= 0b11101111;
+        registers.f &= ~CMASK;
     }
 }
 
@@ -4891,9 +5169,28 @@ void gbCPU::Failure(int code) {switch (code) {
 
 void gbCPU::printInstruction()
 {
-    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
+    // printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
 	
-	// myfile << std::hex << registers.pc << " - " << std::hex << (int)dMEM[registers.pc] << std::endl;
+	if(MEM->flag){
+		printf("PC - %X \n", registers.pc);
+		MEM->flag = 0;
+	}
+
+	#ifdef LOGFILE
+	static bool writing = 0;
+
+	if(registers.pc == 0x6a15){
+		writing = 1;
+	}
+	if(writing){
+		myfile << std::hex << registers.pc << "-" << std::hex << (int)dMEM[registers.pc];
+		myfile << " | AF-" << std::hex << registers.af << " BC-" << std::hex << registers.bc << " DE-" << std::hex << registers.de << " HL-" << std::hex << registers.hl;
+		myfile << std::endl;
+	}
+	if(dMEM[registers.pc] == 0xFF){
+		writing = 0;
+	}
+	#endif
 
 	// printf("%X\n", dMEM[0xFF80]);
 }

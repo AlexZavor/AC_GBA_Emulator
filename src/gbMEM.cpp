@@ -33,24 +33,24 @@ gbMEM::gbMEM() {
 
 // read/write commands to check for cartrage opperation (not active yet)
 uint8_t gbMEM::read(uint16_t address){
-	if (address < 0xC000)
-	{
-		// //Cartrage ram
-		// if (RAMEnabled) {
-		// 	return ram[address - 0xA000 + (0x4000 * rambank)];
-		// }
-		// else {
-		// 	return 0;
-		// 	std::cout << "ram not enabled" << std::endl;
-		// }
-	}
-	else if (address < 0xD000);
-	else if (address < 0xE000)
-	{
-		//Switching Work Ram (GBC)
-		//return Wram[(address - 0xC000) + (WramBank * 0x1000)];
-	}
-	else if (address < 0xFE00);
+	// if (address < 0xC000)
+	// {
+	// 	// //Cartrage ram
+	// 	// if (RAMEnabled) {
+	// 	// 	return ram[address - 0xA000 + (0x4000 * rambank)];
+	// 	// }
+	// 	// else {
+	// 	// 	return 0;
+	// 	// 	std::cout << "ram not enabled" << std::endl;
+	// 	// }
+	// }
+	// else if (address < 0xD000);
+	// else if (address < 0xE000)
+	// {
+	// 	//Switching Work Ram (GBC)
+	// 	//return Wram[(address - 0xC000) + (WramBank * 0x1000)];
+	// }
+	// else if (address < 0xFE00);
 
 	return MEM[address];
 
@@ -106,26 +106,27 @@ void gbMEM::write(uint16_t address, uint8_t data){
 		}
 		return;
 	}
-	else if (address < 0xC000)
-	{
-		//Cartrage ram
-		// if (RAMEnabled) {
-		// 	ram[(address - 0xA000) + (0x4000 * rambank)];
-		// }
-		// else {
-		// 	//Do nothing
-		// 	std::cout << "ram not enabled" << std::endl;
-		// }
+	// else if (address < 0xC000)
+	// {
+	// 	//Cartrage ram
+	// 	// if (RAMEnabled) {
+	// 	// 	ram[(address - 0xA000) + (0x4000 * rambank)];
+	// 	// }
+	// 	// else {
+	// 	// 	//Do nothing
+	// 	// 	std::cout << "ram not enabled" << std::endl;
+	// 	// }
+	// }
+	// else if (address < 0xD000);
+	// else if (address < 0xE000)
+	// {
+	// 	//Switching Work Ram (GBC)
+	// 	// Wram[(address - 0xC000) + (WramBank * 0x1000)] = data;
+	// }
+	// else if (address < 0xFE00);
+	else{
+		MEM[address] = data;
 	}
-	else if (address < 0xD000);
-	else if (address < 0xE000)
-	{
-		//Switching Work Ram (GBC)
-		// Wram[(address - 0xC000) + (WramBank * 0x1000)] = data;
-	}
-	else if (address < 0xFE00);
-
-	MEM[address] = data;
 	
 }
 void gbMEM::orWrite(uint16_t address, uint8_t data){MEM[address] |= data;}
@@ -133,7 +134,7 @@ void gbMEM::andWrite(uint16_t address, uint8_t data){MEM[address] &= data;}
 
 
 bool gbMEM::insertCart(std::string game){
-std::streampos size;
+	std::streampos size;
 	std::ifstream file2(game, std::ios::in | std::ios::binary | std::ios::ate);
 	if (file2.is_open())
 	{
