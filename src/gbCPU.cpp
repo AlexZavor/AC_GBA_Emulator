@@ -2,6 +2,9 @@
 
 // #define LOGFILE
 
+//TODO:
+// CB 26, CB 2E
+
 #ifdef LOGFILE
 #include <fstream>
 std::ofstream myfile;
@@ -2858,11 +2861,12 @@ uint8_t gbCPU::CBPrefix() {
 		setN(0);
 		setH(0);
 		uint8_t hlData = MEM->read(registers.hl);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
 		setC(hlData & 0x01);
 		hlData = ((hlData & 0xFE) >> 1);
 		hlData += (((int)n) << 7);
 		setZ(!hlData);
+		MEM->write(registers.hl, hlData);
 		registers.pc++;
 		return 8;
 	}
@@ -2952,7 +2956,8 @@ uint8_t gbCPU::CBPrefix() {
 		setH(0);
 		uint8_t hlData = MEM->read(registers.hl);
 		setC(hlData & 0x80);
-		MEM->write(registers.hl, (hlData & 0x7F) << 1);
+		hlData <<= 1;
+		MEM->write(registers.hl, hlData);
 		setZ(!hlData);
 		registers.pc++;
 		return 8;
@@ -3041,7 +3046,8 @@ uint8_t gbCPU::CBPrefix() {
 		setH(0);
 		uint8_t hlData = MEM->read(registers.hl);
 		setC(hlData & 0x01);
-		MEM->write(registers.hl, ((hlData & 0xFE) >> 1) + (hlData & 0x80));
+		hlData = ((hlData & 0xFE) >> 1) + (hlData & 0x80);
+		MEM->write(registers.hl, hlData);
 		setZ(!hlData);
 		registers.pc++;
 		return 8;
@@ -3203,7 +3209,8 @@ uint8_t gbCPU::CBPrefix() {
 		setH(0);
 		uint8_t hlData = MEM->read(registers.hl);
 		setC(hlData & 0x01);
-		MEM->write(registers.hl, (hlData & 0xFE) >> 1);
+		hlData >>= 1;
+		MEM->write(registers.hl, hlData);
 		setZ(!hlData);
 		registers.pc++;
 		return 8;
