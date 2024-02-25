@@ -31,7 +31,7 @@ class gbMEM{
     public:
         gbMEM();
         // read with cartrage operations
-        uint8_t read(uint16_t address);
+        // uint8_t read(uint16_t address);
         // write with cartrage operations
         void write(uint16_t address, uint8_t data);
         // wrtie data | mem with cartrage operations

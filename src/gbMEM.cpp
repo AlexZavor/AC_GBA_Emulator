@@ -32,7 +32,7 @@ gbMEM::gbMEM() {
 
 
 // read/write commands to check for cartrage opperation (not active yet)
-uint8_t gbMEM::read(uint16_t address){
+//uint8_t gbMEM::read(uint16_t address){
 	// if (address < 0xC000)
 	// {
 	// 	// //Cartrage ram
@@ -52,9 +52,9 @@ uint8_t gbMEM::read(uint16_t address){
 	// }
 	// else if (address < 0xFE00);
 
-	return MEM[address];
+	// return MEM[address];
 
-}
+//}
 void gbMEM::write(uint16_t address, uint8_t data){
 	if (address < 0x8000) {
 		//Writing to cartrage. probably a register

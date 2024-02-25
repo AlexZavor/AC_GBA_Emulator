@@ -3,7 +3,6 @@
 // #define LOGFILE
 
 //TODO:
-// CB 26, CB 2E
 
 #ifdef LOGFILE
 #include <fstream>
@@ -34,8 +33,8 @@ uint8_t gbCPU::instruction(){
 	case 0x01:		//LD BC, nn
 	{
 		//load nn into BC
-		registers.bc = dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8);
 		registers.pc++;
+		registers.bc = dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8);
 		registers.pc++;//count past the two parameters
 		registers.pc++;
 		return 12;
@@ -77,9 +76,9 @@ uint8_t gbCPU::instruction(){
 	case 0x06:      //LD B, n
 	{
 	    //load n into b
-		registers.b = dMEM[registers.pc + 1];
-		registers.pc++;//count past param
 		registers.pc++;
+		registers.b = dMEM[registers.pc];
+		registers.pc++;//count past param
 		return 8;
 	}
 	case 0x07:		//RLCA
@@ -2535,7 +2534,7 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Rotate Data at HL Left, old bit 7 into carry flag
 		registers.f = 0x00;
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		bool n = (hlData &0b10000000);
 		setC(n);
 		hlData <<= 1;
@@ -2633,7 +2632,7 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Rotate data in HL right, old bit 0 into carry flag
 		registers.f = 0x00;
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		bool n = (hlData & 0b00000001);
 		setC(n);
 		hlData >>= 1;
@@ -2732,7 +2731,7 @@ uint8_t gbCPU::CBPrefix() {
 		//Rotate Data at HL left through Carry Flag
 		bool n = (registers.f & CMASK);
 		registers.f = 0x00;
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		setC(hlData & 0x80);
 		hlData <<= 1;
 		hlData += n;
@@ -2830,7 +2829,7 @@ uint8_t gbCPU::CBPrefix() {
 		//Rotate data at HL right through Carry Flag
 		bool n = (registers.f & CMASK);
 		registers.f = 0x00;
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		setC(hlData & 0x01);
 		hlData >>= 1;
 		hlData += (((uint8_t)n) << 7);
@@ -2915,7 +2914,7 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Shift data at HL Left, into carry, LSB is 0;
 		registers.f = 0x00;
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		setC(hlData & 0x80);
 		hlData <<= 1;
 		MEM->write(registers.hl, hlData);
@@ -2997,7 +2996,7 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Shift data at HL Right, into carry, MSB is Unchanged
 		registers.f = 0x00;
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		setC(hlData & 0x01);
 		hlData = ((hlData & 0xFE) >> 1) + (hlData & 0x80);
 		MEM->write(registers.hl, hlData);
@@ -3072,7 +3071,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x36:		//SWAP (HL)
 	{
 		//Swap Upper and Lower Nibbles of A
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		registers.f = 0b00000000;
 		MEM->write(registers.hl, (hlData << 4) + (hlData >> 4));
 		setZ(!hlData);
@@ -3152,7 +3151,7 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Shift data at HL Right, into carry, MSB is 0;
 		registers.f = 0x00;
-		uint8_t hlData = MEM->read(registers.hl);
+		uint8_t hlData = dMEM[registers.hl];
 		setC(hlData & 0x01);
 		hlData >>= 1;
 		MEM->write(registers.hl, hlData);
@@ -3227,7 +3226,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x46:		//BIT 0, (HL)
 	{
 		//test bit 0 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b00000001));
+		setZ(!(dMEM[registers.hl] & 0b00000001));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3299,7 +3298,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x4E:		//BIT 1, (HL)
 	{
 		//test bit 1 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b00000010));
+		setZ(!(dMEM[registers.hl] & 0b00000010));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3371,7 +3370,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x56:		//BIT 2, (HL)
 	{
 		//test bit 2 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b00000100));
+		setZ(!(dMEM[registers.hl] & 0b00000100));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3443,7 +3442,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x5E:		//BIT 3, (HL)
 	{
 		//test bit 3 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b00001000));
+		setZ(!(dMEM[registers.hl] & 0b00001000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3515,7 +3514,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x66:		//BIT 4, (HL)
 	{
 		//test bit 4 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b00010000));
+		setZ(!(dMEM[registers.hl] & 0b00010000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3587,7 +3586,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x6E:		//BIT 5, (HL)
 	{
 		//test bit 5 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b00100000));
+		setZ(!(dMEM[registers.hl] & 0b00100000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3659,7 +3658,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x76:		//BIT 6, (HL)
 	{
 		//test bit 6 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b01000000));
+		setZ(!(dMEM[registers.hl] & 0b01000000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3731,7 +3730,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x7E:		//BIT 7, (HL)
 	{
 		//test bit 7 in data at adress HL
-		setZ(!(MEM->read(registers.hl) & 0b10000000));
+		setZ(!(dMEM[registers.hl] & 0b10000000));
 		setN(0);
 		setH(1);
 		registers.pc++;
