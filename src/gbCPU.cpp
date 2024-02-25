@@ -2462,11 +2462,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x00:		//RLC B
 	{
 		//Rotate B Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.b & 0b10000000);
 		setC(n);
-		registers.b = (registers.b & 0x7F) << 1;
+		registers.b <<= 1;
 		registers.b += n;
 		setZ(!(registers.b));
 		registers.pc++;
@@ -2475,11 +2474,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x01:		//RLC C
 	{
 		//Rotate C Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.c & 0b10000000);
 		setC(n);
-		registers.c = (registers.c & 0x7F) << 1;
+		registers.c <<= 1;
 		registers.c += n;
 		setZ(!(registers.c));
 		registers.pc++;
@@ -2488,11 +2486,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x02:		//RLC D
 	{
 		//Rotate D Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.d & 0b10000000);
 		setC(n);
-		registers.d = (registers.d & 0x7F) << 1;
+		registers.d <<= 1;
 		registers.d += n;
 		setZ(!(registers.d));
 		registers.pc++;
@@ -2501,11 +2498,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x03:		//RLC E
 	{
 		//Rotate E Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.e & 0b10000000);
 		setC(n);
-		registers.e = (registers.e & 0x7F) << 1;
+		registers.e <<= 1;
 		registers.e += n;
 		setZ(!(registers.e));
 		registers.pc++;
@@ -2514,11 +2510,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x04:		//RLC H
 	{
 		//Rotate H Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.h & 0b10000000);
 		setC(n);
-		registers.h = (registers.h & 0x7F) << 1;
+		registers.h <<= 1;
 		registers.h += n;
 		setZ(!(registers.h));
 		registers.pc++;
@@ -2527,11 +2522,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x05:		//RLC L
 	{
 		//Rotate L Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.l & 0b10000000);
 		setC(n);
-		registers.l = (registers.l & 0x7F) << 1;
+		registers.l <<= 1;
 		registers.l += n;
 		setZ(!(registers.l));
 		registers.pc++;
@@ -2540,12 +2534,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x06:		//RLC (HL)
 	{
 		//Rotate Data at HL Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		uint8_t hlData = MEM->read(registers.hl);
 		bool n = (hlData &0b10000000);
 		setC(n);
-		hlData = (hlData & 0x7F) << 1;
+		hlData <<= 1;
 		hlData += n;
 		setZ(!(hlData));
 		MEM->write(registers.hl, hlData);
@@ -2555,11 +2548,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x07:		//RLC A
 	{
 		//Rotate A Left, old bit 7 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.a & 0b10000000);
 		setC(n);
-		registers.a = (registers.a & 0x7F) << 1;
+		registers.a <<= 1;
 		registers.a += n;
 		setZ(!(registers.a));
 		registers.pc++;
@@ -2568,12 +2560,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x08:		//RRC B
 	{
 		//Rotate B right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.b & 0b00000001);
 		setC(n);
-		registers.b = (registers.b & 0xFE) >> 1;
-		registers.b += ((int)n) << 7;
+		registers.b >>= 1;
+		registers.b += ((uint8_t)n) << 7;
 		setZ(!(registers.b));
 		registers.pc++;
 		return 8;
@@ -2581,12 +2572,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x09:		//RRC C
 	{
 		//Rotate C right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.c & 0b00000001);
 		setC(n);
-		registers.c = (registers.c & 0xFE) >> 1;
-		registers.c += ((int)n) << 7;
+		registers.c >>= 1;
+		registers.c += ((uint8_t)n) << 7;
 		setZ(!(registers.c));
 		registers.pc++;
 		return 8;
@@ -2594,12 +2584,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x0A:		//RRC D
 	{
 		//Rotate D right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.d & 0b00000001);
 		setC(n);
-		registers.d = (registers.d & 0xFE) >> 1;
-		registers.d += ((int)n) << 7;
+		registers.d >>= 1;
+		registers.d += ((uint8_t)n) << 7;
 		setZ(!(registers.d));
 		registers.pc++;
 		return 8;
@@ -2607,12 +2596,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x0B:		//RRC E
 	{
 		//Rotate E right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.e & 0b00000001);
 		setC(n);
-		registers.e = (registers.e & 0xFE) >> 1;
-		registers.e += ((int)n) << 7;
+		registers.e >>= 1;
+		registers.e += ((uint8_t)n) << 7;
 		setZ(!(registers.e));
 		registers.pc++;
 		return 8;
@@ -2620,12 +2608,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x0C:		//RRC H
 	{
 		//Rotate H right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.h & 0b00000001);
 		setC(n);
-		registers.h = (registers.h & 0xFE) >> 1;
-		registers.h += ((int)n) << 7;
+		registers.h >>= 1;
+		registers.h += ((uint8_t)n) << 7;
 		setZ(!(registers.h));
 		registers.pc++;
 		return 8;
@@ -2633,12 +2620,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x0D:		//RRC L
 	{
 		//Rotate L right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.l & 0b00000001);
 		setC(n);
-		registers.l = (registers.l & 0xFE) >> 1;
-		registers.l += ((int)n) << 7;
+		registers.l >>= 1;
+		registers.l += ((uint8_t)n) << 7;
 		setZ(!(registers.l));
 		registers.pc++;
 		return 8;
@@ -2646,13 +2632,12 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x0E:		//RRC (HL)
 	{
 		//Rotate data in HL right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		uint8_t hlData = MEM->read(registers.hl);
 		bool n = (hlData & 0b00000001);
 		setC(n);
-		hlData = (hlData & 0xFE) >> 1;
-		hlData += ((int)n) << 7;
+		hlData >>= 1;
+		hlData += ((uint8_t)n) << 7;
 		setZ(!(hlData));
 		MEM->write(registers.hl, hlData);
 		registers.pc++;
@@ -2661,24 +2646,22 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x0F:		//RRC A
 	{
 		//Rotate A right, old bit 0 into carry flag
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		bool n = (registers.a & 0b00000001);
 		setC(n);
-		registers.a = (registers.a & 0xFE) >> 1;
-		registers.a += ((int)n) << 7;
+		registers.a >>= 1;
+		registers.a += ((uint8_t)n) << 7;
 		setZ(!(registers.a));
 		registers.pc++;
 		return 8;
 	}
 	case 0x10:		//RL B
 	{
-		//Rotate C left through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		//Rotate B left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.b & 0x80);
-		registers.b = (registers.b & 0x7F) << 1;
+		registers.b <<= 1;
 		registers.b += n;
 		setZ(!registers.b);
 		registers.pc++;
@@ -2687,11 +2670,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x11:		//RL C
 	{
 		//Rotate C left through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.c & 0x80);
-		registers.c = (registers.c & 0x7F) << 1;
+		registers.c <<= 1;
 		registers.c += n;
 		setZ(!registers.c);
 		registers.pc++;
@@ -2700,11 +2682,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x12:		//RL D
 	{
 		//Rotate D left through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.d & 0x80);
-		registers.d = (registers.d & 0x7F) << 1;
+		registers.d <<= 1;
 		registers.d += n;
 		setZ(!registers.d);
 		registers.pc++;
@@ -2713,11 +2694,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x13:		//RL E
 	{
 		//Rotate E left through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.e & 0x80);
-		registers.e = (registers.e & 0x7F) << 1;
+		registers.e <<= 1;
 		registers.e += n;
 		setZ(!registers.e);
 		registers.pc++;
@@ -2726,11 +2706,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x14:		//RL H
 	{
 		//Rotate H left through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.h & 0x80);
-		registers.h = (registers.h & 0x7F) << 1;
+		registers.h <<= 1;
 		registers.h += n;
 		setZ(!registers.h);
 		registers.pc++;
@@ -2739,11 +2718,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x15:		//RL L
 	{
 		//Rotate L left through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.l & 0x80);
-		registers.l = (registers.l & 0x7F) << 1;
+		registers.l <<= 1;
 		registers.l += n;
 		setZ(!registers.l);
 		registers.pc++;
@@ -2752,12 +2730,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x16:		//RL (HL)
 	{
 		//Rotate Data at HL left through Carry Flag
-		setN(0);
-		setH(0);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		uint8_t hlData = MEM->read(registers.hl);
-		bool n = (registers.f & 0b00010000);
 		setC(hlData & 0x80);
-		hlData = (hlData & 0x7F) << 1;
+		hlData <<= 1;
 		hlData += n;
 		setZ(!hlData);
 		MEM->write(registers.hl, hlData);
@@ -2767,11 +2744,10 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x17:		//RL A
 	{
 		//Rotate A Left through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.a & 0x80);
-		registers.a = (registers.a & 0x7F) << 1;
+		registers.a <<= 1;
 		registers.a += n;
 		setZ(!registers.a);
 		registers.pc++;
@@ -2780,12 +2756,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x18:		//RR B
 	{
 		//Rotate B right through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.b & 0x01);
-		registers.b = ((registers.b & 0xFE) >> 1);
-		registers.b += (((int)n) << 7);
+		registers.b >>= 1;
+		registers.b += (((uint8_t)n) << 7);
 		setZ(!registers.b);
 		registers.pc++;
 		return 8;
@@ -2793,12 +2768,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x19:		//RR C
 	{
 		//Rotate C right through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.c & 0x01);
-		registers.c = ((registers.c & 0xFE) >> 1);
-		registers.c += (((int)n)<<7);
+		registers.c >>= 1;
+		registers.c += (((uint8_t)n)<<7);
 		setZ(!registers.c);
 		registers.pc++;
 		return 8;
@@ -2806,12 +2780,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x1A:		//RR D
 	{
 		//Rotate D right through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.d & 0x01);
-		registers.d = ((registers.d & 0xFE) >> 1);
-		registers.d += (((int)n) << 7);
+		registers.d >>= 1;
+		registers.d += (((uint8_t)n) << 7);
 		setZ(!registers.d);
 		registers.pc++;
 		return 8;
@@ -2819,12 +2792,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x1B:		//RR E
 	{
 		//Rotate E right through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.e & 0x01);
-		registers.e = ((registers.e & 0xFE) >> 1);
-		registers.e += (((int)n) << 7);
+		registers.e >>= 1;
+		registers.e += (((uint8_t)n) << 7);
 		setZ(!registers.e);
 		registers.pc++;
 		return 8;
@@ -2832,12 +2804,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x1C:		//RR H
 	{
 		//Rotate H right through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.h & 0x01);
-		registers.h = ((registers.h & 0xFE) >> 1);
-		registers.h += (((int)n) << 7);
+		registers.h >>= 1;
+		registers.h += (((uint8_t)n) << 7);
 		setZ(!registers.h);
 		registers.pc++;
 		return 8;
@@ -2845,12 +2816,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x1D:		//RR L
 	{
 		//Rotate L right through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.l & 0x01);
-		registers.l = ((registers.l & 0xFE) >> 1);
-		registers.l += (((int)n) << 7);
+		registers.l >>= 1;
+		registers.l += (((uint8_t)n) << 7);
 		setZ(!registers.l);
 		registers.pc++;
 		return 8;
@@ -2858,13 +2828,12 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x1E:		//RR (HL)
 	{
 		//Rotate data at HL right through Carry Flag
-		setN(0);
-		setH(0);
-		uint8_t hlData = MEM->read(registers.hl);
 		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		uint8_t hlData = MEM->read(registers.hl);
 		setC(hlData & 0x01);
-		hlData = ((hlData & 0xFE) >> 1);
-		hlData += (((int)n) << 7);
+		hlData >>= 1;
+		hlData += (((uint8_t)n) << 7);
 		setZ(!hlData);
 		MEM->write(registers.hl, hlData);
 		registers.pc++;
@@ -2873,12 +2842,11 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x1F:		//RR A
 	{
 		//Rotate A right through Carry Flag
-		setN(0);
-		setH(0);
-		bool n = (registers.f & 0b00010000);
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
 		setC(registers.a & 0x01);
-		registers.a = ((registers.a & 0xFE) >> 1);
-		registers.a += (((int)n) << 7);
+		registers.a>>= 1;
+		registers.a += (((uint8_t)n) << 7);
 		setZ(!registers.a);
 		registers.pc++;
 		return 8;
@@ -2886,10 +2854,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x20:		//SLA B
 	{
 		//Shift B Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.b & 0x80);
-		registers.b = (registers.b & 0x7F) << 1;
+		registers.b <<= 1;
 		setZ(!registers.b);
 		registers.pc++;
 		return 8;
@@ -2897,10 +2864,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x21:		//SLA C
 	{
 		//Shift C Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.c & 0x80);
-		registers.c = (registers.c & 0x7F) << 1;
+		registers.c <<= 1;
 		setZ(!registers.c);
 		registers.pc++;
 		return 8;
@@ -2908,10 +2874,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x22:		//SLA D
 	{
 		//Shift D Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.d & 0x80);
-		registers.d = (registers.d & 0x7F) << 1;
+		registers.d <<= 1;
 		setZ(!registers.d);
 		registers.pc++;
 		return 8;
@@ -2919,10 +2884,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x23:		//SLA E
 	{
 		//Shift E Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.e & 0x80);
-		registers.e = (registers.e & 0x7F) << 1;
+		registers.e <<= 1;
 		setZ(!registers.e);
 		registers.pc++;
 		return 8;
@@ -2930,10 +2894,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x24:		//SLA H
 	{
 		//Shift H Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.h & 0x80);
-		registers.h = (registers.h & 0x7F) << 1;
+		registers.h <<= 1;
 		setZ(!registers.h);
 		registers.pc++;
 		return 8;
@@ -2941,10 +2904,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x25:		//SLA L
 	{
 		//Shift L Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.l & 0x80);
-		registers.l = (registers.l & 0x7F) << 1;
+		registers.l <<= 1;
 		setZ(!registers.l);
 		registers.pc++;
 		return 8;
@@ -2952,8 +2914,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x26:		//SLA (HL)
 	{
 		//Shift data at HL Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		uint8_t hlData = MEM->read(registers.hl);
 		setC(hlData & 0x80);
 		hlData <<= 1;
@@ -2965,10 +2926,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x27:		//SLA A
 	{
 		//Shift A Left, into carry, LSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.a & 0x80);
-		registers.a = (registers.a & 0x7F) << 1;
+		registers.a <<= 1;
 		setZ(!registers.a);
 		registers.pc++;
 		return 8;
@@ -2976,8 +2936,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x28:		//SRA B
 	{
 		//Shift B Right, into carry, MSB is Unchanged;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.b & 0x01);
 		registers.b = ((registers.b & 0xFE) >> 1) + (registers.b & 0x80);
 		setZ(!registers.b);
@@ -2987,8 +2946,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x29:		//SRA C
 	{
 		//Shift C Right, into carry, MSB is Unchanged;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.c & 0x01);
 		registers.c = ((registers.c & 0xFE) >> 1) + (registers.c & 0x80);
 		setZ(!registers.c);
@@ -2998,8 +2956,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x2A:		//SRA D
 	{
 		//Shift D Right, into carry, MSB is Unchanged;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.d & 0x01);
 		registers.d = ((registers.d & 0xFE) >> 1) + (registers.d & 0x80);
 		setZ(!registers.d);
@@ -3009,8 +2966,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x2B:		//SRA E
 	{
 		//Shift E Right, into carry, MSB is Unchanged
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.e & 0x01);
 		registers.e = ((registers.e & 0xFE) >> 1) + (registers.e & 0x80);
 		setZ(!registers.e);
@@ -3020,8 +2976,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x2C:		//SRA H
 	{
 		//Shift h Right, into carry, MSB is Unchanged
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.h & 0x01);
 		registers.h = ((registers.h & 0xFE) >> 1) + (registers.h & 0x80);
 		setZ(!registers.h);
@@ -3031,8 +2986,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x2D:		//SRA L
 	{
 		//Shift L Right, into carry, MSB is Unchanged
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.l & 0x01);
 		registers.l = ((registers.l & 0xFE) >> 1) + (registers.l & 0x80);
 		setZ(!registers.l);
@@ -3042,8 +2996,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x2E:		//SRA (HL)
 	{
 		//Shift data at HL Right, into carry, MSB is Unchanged
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		uint8_t hlData = MEM->read(registers.hl);
 		setC(hlData & 0x01);
 		hlData = ((hlData & 0xFE) >> 1) + (hlData & 0x80);
@@ -3055,8 +3008,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x2F:		//SRA A
 	{
 		//Shift A Right, into carry, MSB is Unchanged
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.a & 0x01);
 		registers.a = ((registers.a & 0xFE) >> 1) + (registers.a & 0x80);
 		setZ(!registers.a);
@@ -3139,10 +3091,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x38:		//SRL B
 	{
 		//Shift B Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.b & 0x01);
-		registers.b = (registers.b & 0xFE) >> 1;
+		registers.b >>= 1;
 		setZ(!registers.b);
 		registers.pc++;
 		return 8;
@@ -3150,10 +3101,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x39:		//SRL C
 	{
 		//Shift C Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.c & 0x01);
-		registers.c = (registers.c & 0xFE) >> 1;
+		registers.c >>= 1;
 		setZ(!registers.c);
 		registers.pc++;
 		return 8;
@@ -3161,10 +3111,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x3A:		//SRL D
 	{
 		//Shift D Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.d & 0x01);
-		registers.d = (registers.d & 0xFE) >> 1;
+		registers.d >>= 1;
 		setZ(!registers.d);
 		registers.pc++;
 		return 8;
@@ -3172,10 +3121,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x3B:		//SRL E
 	{
 		//Shift E Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.e & 0x01);
-		registers.e = (registers.e & 0xFE) >> 1;
+		registers.e >>= 1;
 		setZ(!registers.e);
 		registers.pc++;
 		return 8;
@@ -3183,10 +3131,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x3C:		//SRL H
 	{
 		//Shift h Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.h & 0x01);
-		registers.h = (registers.h & 0xFE) >> 1;
+		registers.h >>= 1;
 		setZ(!registers.h);
 		registers.pc++;
 		return 8;
@@ -3194,10 +3141,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x3D:		//SRL L
 	{
 		//Shift L Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.l & 0x01);
-		registers.l = (registers.l & 0xFE) >> 1;
+		registers.l >>= 1;
 		setZ(!registers.l);
 		registers.pc++;
 		return 8;
@@ -3205,8 +3151,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x3E:		//SRL (HL)
 	{
 		//Shift data at HL Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		uint8_t hlData = MEM->read(registers.hl);
 		setC(hlData & 0x01);
 		hlData >>= 1;
@@ -3218,10 +3163,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x3F:		//SRL A
 	{
 		//Shift A Right, into carry, MSB is 0;
-		setN(0);
-		setH(0);
+		registers.f = 0x00;
 		setC(registers.a & 0x01);
-		registers.a = (registers.a & 0xFE) >> 1;
+		registers.a >>= 1;
 		setZ(!registers.a);
 		registers.pc++;
 		return 8;
