@@ -17,6 +17,8 @@ class gbEmulator{
     public:
         //Constructor. should initialize things like memory and prepare for first instruction
         gbEmulator(SDL_Renderer* renderer);
+        //Deconstructor. saves game, deletes old things
+        ~gbEmulator();
         //Calls the GB Emulator to run for one frame and return the output
         void runFrame(inputData input);
         //Inserts a cartrage into the Game Boy

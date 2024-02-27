@@ -30,31 +30,11 @@ gbMEM::gbMEM() {
     initMem();
 }
 
+gbMEM::~gbMEM()
+{
+	saveRam();
+}
 
-// read/write commands to check for cartrage opperation (not active yet)
-//uint8_t gbMEM::read(uint16_t address){
-	// if (address < 0xC000)
-	// {
-	// 	// //Cartrage ram
-	// 	// if (RAMEnabled) {
-	// 	// 	return ram[address - 0xA000 + (0x4000 * rambank)];
-	// 	// }
-	// 	// else {
-	// 	// 	return 0;
-	// 	// 	std::cout << "ram not enabled" << std::endl;
-	// 	// }
-	// }
-	// else if (address < 0xD000);
-	// else if (address < 0xE000)
-	// {
-	// 	//Switching Work Ram (GBC)
-	// 	//return Wram[(address - 0xC000) + (WramBank * 0x1000)];
-	// }
-	// else if (address < 0xFE00);
-
-	// return MEM[address];
-
-//}
 void gbMEM::write(uint16_t address, uint8_t data){
 	if (address < 0x8000) {
 		//Writing to cartrage. probably a register
@@ -78,8 +58,7 @@ void gbMEM::write(uint16_t address, uint8_t data){
 				bank = data & 0x1F;
 				if (bank == 0) {
 					bank = 1;
-				}
-				if (banks < 16) {
+				}if (banks < 16) {
 					bank &= 0b00001111;
 				}if (banks < 8) {
 					bank &= 0b00000111;
@@ -88,17 +67,14 @@ void gbMEM::write(uint16_t address, uint8_t data){
 				}
 				// printf("Bank swap - %d\n", bank);
 				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
-				// for (int byte = 0; byte < 0x4000; byte++)
-				// {
-				// 	MEM[0x4000 + byte] = cartrage[((long)bank * (long)0x4000) + byte];
-				// }
 			}
 			else if (address < 0x6000) {
 				//RAM Bank Number
-				// rambank = data;
-				// if (rambank > rambanks) {
-				// 	rambank = 0;
-				// }
+				ramBank = data;
+				if (ramBank > ramBanks) {
+					ramBank = 0;
+				}
+				// swapRam();
 			}
 			break;
 		default:
@@ -140,13 +116,11 @@ bool gbMEM::insertCart(std::string game){
 	{
 		size = file2.tellg();
 		cartrage = new char[(int)size];
+		this->game = game.erase(game.size() - 3, game.size() - 1).erase(0,5);
 		file2.seekg(0, std::ios::beg);
 		file2.read(cartrage, size);
 		file2.close();
 		memcpy(MEM, cartrage, 0x8000);
-		// for (int d = 0; d < 0x8000; d++) {
-		// 	MEM[d] = cartrage[d];
-		// }
 		if (!setMBC(MEM[0x0147])) {
 			std::cout << "Unrecognized MBC - ";
 			printf("%.2X\n", MEM[0x0147]);
@@ -154,10 +128,7 @@ bool gbMEM::insertCart(std::string game){
 		}
 		else {
 			setBanks(MEM[0x0148]);
-			// std::cout << "loading save - ";
-			// setRam(MEM[0x0149], Game, MEM);
-			// std::cout << "Cartrage Loaded - ";
-			// printf("%.2X\n", MEM[0x0147]);
+			setRam(MEM[0x0149]);
 		}
 	}
 	else {
@@ -175,6 +146,16 @@ bool gbMEM::insertCart(std::string game){
 }
 
 void gbMEM::initMem() {
+	cartMBC = MBC::NONE;
+	RAMEnabled = false;
+	bank = 1;
+	banks = 2;
+	ramBank = 0;
+	ramBanks = 0;
+	battery = false;
+	RAM = false;
+	timer = false;
+
     MEM[0xFF01] = 0x00;
 	MEM[0xFF02] = 0x7E;
 	MEM[0xFF04] = 0x00;
@@ -214,18 +195,89 @@ bool gbMEM::setMBC(uint8_t code) {
 	{
 	case 0x00:
 		cartMBC = MBC::NONE;
-		printf("MBC - NONE\n");
+		// printf("MBC - NONE\n");
 		return true;
 	case 0x01:
 		cartMBC = MBC::MBC1;
-		printf("MBC - MBC1\n");
+		// printf("MBC - MBC1\n");
+		return true;
+	case 0x02:
+		cartMBC = MBC::MBC1;
+		RAM = true;
+		// printf("MBC - MBC1\n");
+		return true;
+	case 0x03:
+		cartMBC = MBC::MBC1;
+		RAM = true;
+		battery = true;
+		// printf("MBC - MBC1\n");
 		return true;
 	default:
 		return false;
 	}
 }
 bool gbMEM::setBanks(uint8_t code) {
-	banks = 0x0002;
+	banks = 0x0001;
 	banks = banks << (code);
 	return true;
+}
+
+bool gbMEM::setRam(uint8_t code) {
+	switch (code)
+	{
+	case 0x00:
+		RAM = false;
+		break;
+	case 0x02:
+		ramBanks = 1;
+		break;
+	case 0x03:
+		ramBanks = 4;
+		break;
+	case 0x04:
+		ramBanks = 16;
+		break;
+	case 0x05:
+		ramBanks = 8;
+		break;
+	default:
+		return false;
+	}
+	ram = new char[(int)ramBanks * 0x2000];
+	if (ramBanks > 0) {
+		std::cout << "loading save - ";
+		std::ifstream file("SAVES/" + (game) + ".SAV", std::ios::in | std::ios::binary | std::ios::ate);
+		if (file.is_open())
+		{
+			std::cout << "save loaded" << std::endl;
+			file.seekg(0, std::ios::beg);
+			file.read(ram, (int)ramBanks * 0x2000);
+			file.close();
+			memcpy(MEM + 0xA000, ram + (ramBank*0x2000), 0x2000);
+		}
+		else {
+			std::cout << "Save not found" << std::endl;
+		}
+	}
+	return true;
+}
+bool gbMEM::saveRam() {
+	if (ramBanks > 0 && battery) {
+		memcpy(ram + ramBank * 0x2000, MEM + 0xA000, 0x2000);
+		std::ofstream file("SAVES/" + (game) + ".SAV");
+		file.open("SAVES/" + (game) + ".SAV", std::ios::out | std::ios::binary);
+		if (file.is_open())
+		{
+			file.clear();
+			file.write((char*)ram, (int)ramBanks * 0x2000);
+			file.close();
+			std::cout << "Saved game \n\n";
+			return 1;
+		}
+		else {
+			std::cout << "failed to save \n\n";
+			return 0;
+		}
+	}
+	return 1;
 }

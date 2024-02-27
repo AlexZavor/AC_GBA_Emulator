@@ -27,9 +27,18 @@ class gbMEM{
         bool RAMEnabled;
         uint16_t bank;
         uint16_t banks;
+        uint8_t ramBank;
+        uint8_t ramBanks;
+        bool battery;
+        bool RAM;
+        bool timer;
+
+        // Name of current game
+        std::string game;
 
     public:
         gbMEM();
+        ~gbMEM();
         // read with cartrage operations
         // uint8_t read(uint16_t address);
         // write with cartrage operations
@@ -49,6 +58,10 @@ class gbMEM{
         bool setMBC(uint8_t code);
         // Set number of banks from code
         bool setBanks(uint8_t code);
+        // Set in number of ram banks, and load ram if needed.
+        bool setRam(uint8_t code);
+        // Save the game before you leave!
+        bool saveRam();
 };
 
 #endif /* GBMEM_H */

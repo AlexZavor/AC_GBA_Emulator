@@ -96,14 +96,9 @@ uint8_t gbCPU::instruction(){
 	case 0x08:		//LD (nn),SP
 	{
 		//Put SP into memory at adress nn
-		if (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8) > 0x8000) {//MEM Bank Stuff
-			dMEM[dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8)] = registers.sp & 0x00FF;
-			dMEM[dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8) + 1] = ((registers.sp & 0xFF00) >> 8);
-		}
-		else {
-			MEM->write(dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8) + 1, registers.sp & 0xFF00);
-		}
 		registers.pc++;
+		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8)	 , registers.sp & 0x00FF);
+		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8) + 1, (registers.sp & 0xFF00)>>8);
 		registers.pc++;//count past the two parameters
 		registers.pc++;
 		return 20;
@@ -967,12 +962,7 @@ uint8_t gbCPU::instruction(){
 	case 0x70:		//LD (HL), B
 	{
 		//Put value of register B into memory at (HL)
-		if (registers.hl > 0x8000) {//MEM Bank Stuff
-			dMEM[registers.hl] = registers.b;
-		}
-		else {
-			MEM->write(registers.hl, registers.b);
-		}
+		MEM->write(registers.hl, registers.b);
 		registers.pc++;
 		return 8;
 	}
@@ -4547,7 +4537,7 @@ void gbCPU::timers(uint8_t clock) {
 			cycles = 256;
 			break;
 		}
-		while(clkCount >= cycles) {
+		if(clkCount >= cycles) {
 			dMEM[0xFF05]++;
 			if (dMEM[0xFF05] == 0) {
 				//overflow, reset, and request interrupt
@@ -4577,12 +4567,12 @@ int gbCPU::interrupts(int cycles) {
 	if (dMEM[0xFF04] != DIV) {
 		DIV = 0x00;
 		dMEM[0xFF04] = 0x00;
-	}
-	else {
+	} else {
 		DIV+=cycles-1;
 		dMEM[0xFF04]+=cycles-1;
 	}
 
+	// Interrupts
 	if (IME) {
 		if		(dMEM[0xFFFF] & 0b00000001 && dMEM[0xFF0F] & 0b00000001) {//Vblank
 			dMEM[0xFF0F] &= 0b11111110;

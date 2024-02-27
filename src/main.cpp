@@ -1,4 +1,7 @@
-// #define SDL_MAIN_HANDLED
+#ifdef DEBUG
+	#define FPS_COUNT
+#endif
+
 #include <stdio.h>
 #include <vector>
 #include "tinydir.h"
@@ -14,7 +17,6 @@
 
 #define GAME_DIR "ROMS/"
 #define SAVE_DIR "SAVES/"
-#define GAME "ROMS/Tetris.gb"
 
 #define KEY_UP		SDLK_UP
 #define KEY_DOWN	SDLK_DOWN
@@ -27,6 +29,11 @@
 #define KEY_RB		SDLK_w
 #define KEY_LB		SDLK_q
 #define KEY_MENU	SDLK_ESCAPE
+
+#ifdef FPS_COUNT
+ unsigned int startTime = 0;
+ unsigned int endTime = 0;
+#endif
 
 bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 	//Initialize SDL
@@ -165,6 +172,9 @@ int main(int argc, char* argv[]) {
 						break;
 						case KEY_MENU:
 						menu = true;
+						if(Emulator != nullptr){
+							delete Emulator;
+						}
 						break;
 					}
 				}
@@ -248,12 +258,21 @@ int main(int argc, char* argv[]) {
 				SDL_RenderPresent( renderer );
 			}else{
 
-				Emulator->runFrame(input);
+				#ifdef FPS_COUNT
+					startTime = SDL_GetTicks();
+				#endif
 
+				//Run Emulator for one frame
+				Emulator->runFrame(input);
 				//Update screen
-				// SDL_SetRenderDrawColor(renderer, 255,0,0,255);
-				// SDL_RenderDrawLine(renderer, 0, 0, rand()%100, rand()%100);
 				SDL_RenderPresent( renderer );
+
+				#ifdef FPS_COUNT
+					endTime = SDL_GetTicks();
+					if(endTime - startTime > 20){
+						printf("%d\n",(endTime - startTime));
+					}
+				#endif
 			}
 		}
 
