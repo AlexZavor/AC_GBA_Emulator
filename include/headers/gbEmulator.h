@@ -16,7 +16,7 @@ class gbEmulator{
         gbPPU* PPU;
     public:
         //Constructor. should initialize things like memory and prepare for first instruction
-        gbEmulator(SDL_Renderer* renderer);
+        gbEmulator(SDL_Renderer* renderer, SDL_Texture* texture);
         //Deconstructor. saves game, deletes old things
         ~gbEmulator();
         //Calls the GB Emulator to run for one frame and return the output

@@ -1,10 +1,22 @@
 #include "gbPPU.h"
 
-gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend)
-{
+/*
+PPU Tests
+Basic old graphics		max - 57, min - 0
+No graphics 			max - 3,  min - 0
+No SDL_Renderer calls	max - 5,  min - 0
+Write to Array			max - 6,  min - 0
+render array once 		max - 59, min - 11
+pixel pusher 			max - 17, min - 2 (but adverage was like 3-4!)
+final design			max - 10.7, min - 4.1 (better when plugged in)
+*/
+// #define GREEN_PALLET
+
+gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu) {
     MEM = memory;
     dMEM = memory->MEM;
     renderer = rend;
+	texture = textu;
 }
 
 void gbPPU::drawLine(uint8_t line)
@@ -53,6 +65,75 @@ void gbPPU::drawLine(uint8_t line)
 		dMEM[0xFF41] &= 0b11111011;
 		dMEM[0xFF0F] &= 0b11111101;
 	}
+}
+
+void gbPPU::renderFrame(){
+	// The Back Buffer texture may be stored with an extra bit of width (pitch) on the video card in order to properly
+    // align it in VRAM should the width not lie on the correct memory boundary (usually four bytes).
+    int32_t pitch = 0;
+
+    // This will hold a pointer to the memory position in VRAM where our Back Buffer texture lies
+    uint32_t* pixelBuffer = nullptr;
+
+    // Lock the memory in order to write our Back Buffer image to it
+    if (!SDL_LockTexture(texture, NULL, (void**)&pixelBuffer, &pitch))
+    {
+        // The pitch of the Back Buffer texture in VRAM must be divided by four bytes
+        // as it will always be a multiple of four
+        pitch /= sizeof(uint32_t);
+
+        // Fill texture with randomly colored pixels
+        for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
+			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
+				#ifdef GREEN_PALLET
+				switch (Vram[y/SCALE][x/SCALE])
+				{
+				case 0:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x9bbc0f;
+					break;
+				case 1:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x8bac0f;
+					break;
+				case 2:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x306230;
+					break;
+				case 3:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x0f380f;
+					break;
+				default:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xfc03e8;
+					break;
+				}
+				#else
+				switch (Vram[y/SCALE][x/SCALE])
+				{
+				case 0:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xffffff;
+					break;
+				case 1:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xa9a9a9;
+					break;
+				case 2:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x545454;
+					break;
+				case 3:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x000000;
+					break;
+				default:
+            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xfc03e8;
+					break;
+				}
+				#endif
+			}
+		}
+
+        // Unlock the texture in VRAM to let the GPU know we are done writing to it
+        SDL_UnlockTexture(texture);
+
+        // Copy our texture in VRAM to the display framebuffer in VRAM
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+    }
+	return;
 }
 
 void gbPPU::drawBackground() {
@@ -121,11 +202,9 @@ void gbPPU::drawBackground() {
 		default:
 			break;
 		}
-		// Vram[x][y] = pixel;
-        SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
-        SDL_RenderDrawPoint(renderer, x, y);
-		currentLine[x] = pixel;
-        // printf("%s\n",SDL_GetError());
+		Vram[x][y] = pixel;
+        // SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
+        // SDL_RenderDrawPoint(renderer, x, y);
 	}
 }
 
@@ -181,10 +260,9 @@ void gbPPU::drawWindow() {
 				(((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2) + 1] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
 		}
 		if ((x - (dMEM[0xFF4B] - 7) <= 160) && (x - (dMEM[0xFF4B] - 7) > 0) && (y - dMEM[0xFF4A] < 144) && (y - dMEM[0xFF4A] >= 0)) {
-			// Vram[x][y] = pixel;
-            SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
-            SDL_RenderDrawPoint(renderer, x, y);
-			currentLine[x] = pixel;
+			Vram[x][y] = pixel;
+            // SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
+            // SDL_RenderDrawPoint(renderer, x, y);
 		}
 	}
 }
@@ -239,7 +317,7 @@ void gbPPU::drawSprites() {
 				uint8_t Y = ypos + r;
 				uint8_t X = xpos + bit;
 				if (Y >= 0 && Y < 144 && X >= 0 && X < 160) {
-					if ((!(flags & 0b10000000)) || currentLine[X] == 0) {
+					if ((!(flags & 0b10000000)) || Vram[X][Y] == 0) {
 						switch (pixel)
 						{
 						case 1:
@@ -254,10 +332,9 @@ void gbPPU::drawSprites() {
 						default:
 							break;
 						}
-						// Vram[X][Y] = pixel;
-                        SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
-                        SDL_RenderDrawPoint(renderer, X, Y);
-						currentLine[X] = pixel;
+						Vram[X][Y] = pixel;
+                        // SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
+                        // SDL_RenderDrawPoint(renderer, X, Y);
 					}
 				}
 			}

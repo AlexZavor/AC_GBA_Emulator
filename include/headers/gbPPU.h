@@ -6,17 +6,25 @@
 #include "gbMEM.h"
 #include <vector>
 
+#define SCALE 4
+//Screen dimension constants
+#define SCREEN_WIDTH (160 * SCALE)
+#define SCREEN_HEIGHT (144 * SCALE)
+
 class gbPPU{
     private:
         gbMEM* MEM;
         uint8_t* dMEM;
         SDL_Renderer* renderer;
+        SDL_Texture* texture;
 
-        uint8_t currentLine[160];
+        uint8_t Vram[160][144];
 
     public:
-        gbPPU(gbMEM* memory, SDL_Renderer* rend);
+        gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu);
         void drawLine(uint8_t line);
+
+        void renderFrame();
 
     private:
         void drawBackground();

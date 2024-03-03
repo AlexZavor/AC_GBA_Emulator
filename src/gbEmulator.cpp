@@ -1,9 +1,9 @@
 #include "gbEmulator.h"
 
-gbEmulator::gbEmulator(SDL_Renderer* renderer) {
+gbEmulator::gbEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     MEM = new gbMEM();
     CPU = new gbCPU(MEM);
-    PPU = new gbPPU(MEM, renderer);
+    PPU = new gbPPU(MEM, renderer, texture);
 }
 
 gbEmulator::~gbEmulator()
@@ -48,6 +48,7 @@ void gbEmulator::runFrame(inputData input) {
         //Draw line
         PPU->drawLine(line);
     }
+    PPU->renderFrame();
 }
 
 bool gbEmulator::insertCart(std::string game) {

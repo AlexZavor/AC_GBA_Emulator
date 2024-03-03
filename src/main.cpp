@@ -1,5 +1,5 @@
 #ifdef DEBUG
-	#define FPS_COUNT
+	// #define FPS_COUNT
 #endif
 
 #include <stdio.h>
@@ -10,14 +10,10 @@
 #include "inputData.h"
 #include "gbEmulator.h"
 
-#define SCALE 4
-//Screen dimension constants
-#define SCREEN_WIDTH (160 * SCALE)
-#define SCREEN_HEIGHT (144 * SCALE)
-
 #define GAME_DIR "ROMS/"
 #define SAVE_DIR "SAVES/"
 
+//Key definitions
 #define KEY_UP		SDLK_UP
 #define KEY_DOWN	SDLK_DOWN
 #define KEY_LEFT	SDLK_LEFT
@@ -31,11 +27,11 @@
 #define KEY_MENU	SDLK_ESCAPE
 
 #ifdef FPS_COUNT
- unsigned int startTime = 0;
- unsigned int endTime = 0;
+	float minTime = 200;
+	float maxTime = 0;
 #endif
 
-bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
+bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer, SDL_Texture** texture){
 	//Initialize SDL
 	if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
 		printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError() );
@@ -48,10 +44,16 @@ bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 		return 0;
 	}
 	//Create vsynced renderer for window
-	*renderer = SDL_CreateRenderer( *window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC );
+	*renderer = SDL_CreateRenderer( *window, -1, SDL_RENDERER_ACCELERATED /*| SDL_RENDERER_PRESENTVSYNC*/ );
 	if( *renderer == NULL ) {
 		printf( "Renderer could not be created! SDL Error: %s\n", SDL_GetError() );
 	}
+	//Create texture to render pixels to.
+	*texture = SDL_CreateTexture(*renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
+	if( *texture == NULL ) {
+		printf( "Texture could not be created! SDL Error: %s\n", SDL_GetError() );
+	}
+
 	SDL_RenderSetScale(*renderer, SCALE, SCALE);
 
 	TTF_Init();
@@ -59,7 +61,11 @@ bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 	return true;
 }
 
-bool closeSDL(SDL_Window* window, SDL_Renderer* renderer){
+bool closeSDL(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture){
+	//Destroy window
+	if( texture != NULL ) {
+		SDL_DestroyTexture( texture );
+	}
 	//Destroy renderer
 	if( renderer != NULL ) {
 		SDL_DestroyRenderer(renderer);
@@ -84,13 +90,14 @@ void loadGames(std::vector<std::string>* Roms){
         tinydir_readfile(&dir, &file);
 
         if((file.name)[0] != '.'){
-            // printf("%s", file.name);
-            // if (file.is_dir)
-            // {
-            //     printf("/");
-            // }
-            // printf("\n");
-			Roms->push_back(file.name);
+			uint8_t i = 0;
+			while (file.name[i] != '\0')
+			{
+				i++;
+			}
+			if(file.name[i-1] == 'b'){
+				Roms->push_back(file.name);
+			}
         }
 
         tinydir_next(&dir);
@@ -105,6 +112,8 @@ int main(int argc, char* argv[]) {
 	SDL_Window* window = NULL;
 	// The window renderer
 	SDL_Renderer* renderer = NULL;
+	// The texture to render to
+    SDL_Texture* texture = NULL;
 	// Event handler
 	SDL_Event e;
 	// Input from the player
@@ -114,7 +123,7 @@ int main(int argc, char* argv[]) {
 	std::vector<std::string> Roms;
 	loadGames(&Roms);
 
-	if(initializeSDL(&window, &renderer)){
+	if(initializeSDL(&window, &renderer, &texture)){
 		// Menu system
 		std::string Game;
 		unsigned int page = 0;
@@ -172,6 +181,9 @@ int main(int argc, char* argv[]) {
 						break;
 						case KEY_MENU:
 						menu = true;
+						#ifdef FPS_COUNT
+							printf("max - %f, min - %f\n", maxTime, minTime);
+						#endif
 						if(Emulator != nullptr){
 							delete Emulator;
 						}
@@ -249,7 +261,7 @@ int main(int argc, char* argv[]) {
 				if (input.A || input.sel || input.start) {
 					Game = GAME_DIR + Roms[selection];
 					//Create Emulator
-					Emulator = new gbEmulator(renderer);
+					Emulator = new gbEmulator(renderer, texture);
 					//Insert cartrage, if succsess, leave menu
 					if(Emulator->insertCart(Game)){
 						menu = false;
@@ -258,20 +270,24 @@ int main(int argc, char* argv[]) {
 				SDL_RenderPresent( renderer );
 			}else{
 
-				#ifdef FPS_COUNT
-					startTime = SDL_GetTicks();
-				#endif
+				Uint64 start = SDL_GetPerformanceCounter();
 
 				//Run Emulator for one frame
 				Emulator->runFrame(input);
 				//Update screen
 				SDL_RenderPresent( renderer );
 
+				Uint64 end = SDL_GetPerformanceCounter();
+				float elapsedMS = (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
+				// Cap to 60 FPS
+				SDL_Delay((16.666f - elapsedMS));
+
 				#ifdef FPS_COUNT
-					endTime = SDL_GetTicks();
-					if(endTime - startTime > 20){
-						printf("%d\n",(endTime - startTime));
+					if(elapsedMS > 20){
+						printf("%f\n",(elapsedMS));
 					}
+					if(elapsedMS > maxTime){maxTime = elapsedMS;}
+					if(elapsedMS < minTime){minTime = elapsedMS;}
 				#endif
 			}
 		}
@@ -279,7 +295,7 @@ int main(int argc, char* argv[]) {
 		delete Emulator;
 	}
 
-	closeSDL(window, renderer);
+	closeSDL(window, renderer, texture);
 
 	return 0;
 }
