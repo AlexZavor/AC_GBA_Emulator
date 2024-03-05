@@ -4578,7 +4578,7 @@ int gbCPU::interrupts(int cycles) {
 			dMEM[0xFF0F] &= 0b11111110;
 			preIME = false;
 			halted = false;
-			IntCycles += 32;
+			IntCycles += 20;
 			PushStack(((registers.pc) & 0xFF00) >> 8);
 			PushStack((registers.pc) & 0x00FF);
 			registers.pc = 0x0040;
@@ -4588,7 +4588,7 @@ int gbCPU::interrupts(int cycles) {
 			dMEM[0xFF0F] &= 0b11111101;
 			preIME = false;
 			halted = false; 
-			IntCycles += 32;
+			IntCycles += 20;
 			PushStack(((registers.pc) & 0xFF00) >> 8);
 			PushStack((registers.pc) & 0x00FF);
 			registers.pc = 0x0048;
@@ -4598,7 +4598,7 @@ int gbCPU::interrupts(int cycles) {
 			dMEM[0xFF0F] &= 0b11111011;
 			preIME = false;
 			halted = false;
-			IntCycles += 32;
+			IntCycles += 20;
 			PushStack(((registers.pc) & 0xFF00) >> 8);
 			PushStack((registers.pc) & 0x00FF);
 			registers.pc = 0x0050;

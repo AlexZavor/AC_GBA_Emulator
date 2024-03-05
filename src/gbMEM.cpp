@@ -1,3 +1,4 @@
+
 #include "gbMEM.h"
 /*
 Interrupt Enable Register
@@ -69,12 +70,63 @@ void gbMEM::write(uint16_t address, uint8_t data){
 				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
 			}
 			else if (address < 0x6000) {
-				//RAM Bank Number
+				//RAM Bank Number / upper bits
+				if(ramBanks > 1){
+					printf("Swap ram bank - MBC1\n");
+					// Save old ram
+					memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
+					// Load new data
+					ramBank = data;
+					if (ramBank > ramBanks) {
+						ramBank = 0;
+					}
+					memcpy(MEM + 0xA000, ram + (ramBank * 0x2000), 0x2000);
+				}
+				if(banks >= 64){
+					printf("ERROR: upper bits change - MBC1\n");
+				}
+			}
+			else if (address < 0x8000) {
+				//Banking Mode Select
+				printf("ERROR: Banking Mode Select - MBC1\n");
+			}
+			break;
+		case MBC::MBC5:
+			if (address < 0x2000) {
+				//Ram Enable
+				if ((data & 0x0F) == 0x0A) {
+					RAMEnabled = true;
+				}
+				else {
+					RAMEnabled = false;
+				}
+			}
+			else if (address < 0x3000) {
+				//ROM Bank Number
+				bank &= 0xFF00;
+				bank |= data;
+				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
+			}
+			else if (address < 0x4000) {
+				//ROM Bank Number
+				bank &= 0x00FF;
+				bank |= ((uint16_t)(data&0x01))<<8;
+				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
+			}
+			else if (address < 0x6000) {
+				//RAM Bank Number / upper bits
+				printf("Swap ram bank - MBC5\n");
+				// Save old ram
+				memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
+				// Load new data
 				ramBank = data;
 				if (ramBank > ramBanks) {
 					ramBank = 0;
 				}
-				// swapRam();
+				memcpy(MEM + 0xA000, ram + (ramBank * 0x2000), 0x2000);
+			}
+			else if (address < 0x8000) {
+				printf("ERROR: Nothing here - MBC5\n");
 			}
 			break;
 		default:
@@ -103,10 +155,13 @@ void gbMEM::write(uint16_t address, uint8_t data){
 	else{
 		MEM[address] = data;
 	}
-	
 }
-void gbMEM::orWrite(uint16_t address, uint8_t data){MEM[address] |= data;}
-void gbMEM::andWrite(uint16_t address, uint8_t data){MEM[address] &= data;}
+void gbMEM::orWrite(uint16_t address, uint8_t data){
+	write(address, MEM[address] | data);
+}
+void gbMEM::andWrite(uint16_t address, uint8_t data){
+	write(address, MEM[address] & data);
+}
 
 
 bool gbMEM::insertCart(std::string game){
@@ -122,7 +177,7 @@ bool gbMEM::insertCart(std::string game){
 		file2.close();
 		memcpy(MEM, cartrage, 0x8000);
 		if (!setMBC(MEM[0x0147])) {
-			std::cout << "Unrecognized MBC - ";
+			std::cout << "\n Unrecognized MBC - ";
 			printf("%.2X\n", MEM[0x0147]);
 			return false;
 		}
@@ -132,12 +187,12 @@ bool gbMEM::insertCart(std::string game){
 		}
 	}
 	else {
-		printf("unable to load Cartrage!\n");
+		printf("\n Unable to load Cartrage!\n");
 		return false;
 	}
     
     //Print out Title of Game Cartrage! EPIC!
-    printf("loaded Cartrage - ");
+    printf("\n loaded Cartrage - ");
     for (int i = 0x134; i < 0x142; i++) {
         std::cout << ((char)MEM[i]);
     }
@@ -155,6 +210,7 @@ void gbMEM::initMem() {
 	battery = false;
 	RAM = false;
 	timer = false;
+	rumble = false;
 
     MEM[0xFF01] = 0x00;
 	MEM[0xFF02] = 0x7E;
@@ -193,32 +249,91 @@ void gbMEM::initMem() {
 bool gbMEM::setMBC(uint8_t code) {
 	switch (code)
 	{
+	// No MBC
 	case 0x00:
 		cartMBC = MBC::NONE;
-		// printf("MBC - NONE\n");
 		return true;
+	// MBC 1
 	case 0x01:
 		cartMBC = MBC::MBC1;
-		// printf("MBC - MBC1\n");
 		return true;
 	case 0x02:
 		cartMBC = MBC::MBC1;
 		RAM = true;
-		// printf("MBC - MBC1\n");
 		return true;
 	case 0x03:
 		cartMBC = MBC::MBC1;
 		RAM = true;
 		battery = true;
-		// printf("MBC - MBC1\n");
 		return true;
+	// MBC 2 - Unimplemented
+	case 0x05:
+		cartMBC = MBC::MBC2;
+		return false;
+	case 0x06:
+		cartMBC = MBC::MBC2;
+		battery = true;
+		return false;
+	// MBC 3 - Unimplemented
+	case 0x0F:
+		cartMBC = MBC::MBC3;
+		timer = true;
+		battery = true;
+		return false;
+	case 0x10:
+		cartMBC = MBC::MBC3;
+		timer = true;
+		RAM = true;
+		battery = true;
+		return false;
+	case 0x11:
+		cartMBC = MBC::MBC3;
+		return false;
+	case 0x12:
+		cartMBC = MBC::MBC3;
+		RAM = true;
+		return false;
+	case 0x13:
+		cartMBC = MBC::MBC3;
+		RAM = true;
+		battery = true;
+		return false;
+	// MBC 5
+	case 0x19:
+		cartMBC = MBC::MBC5;
+		return true;
+	case 0x1A:
+		cartMBC = MBC::MBC5;
+		RAM = true;
+		return true;
+	case 0x1B:
+		cartMBC = MBC::MBC5;
+		RAM = true;
+		battery = true;
+		return true;
+	case 0x1C:
+		cartMBC = MBC::MBC5;
+		rumble = true;
+		return true;
+	case 0x1D:
+		cartMBC = MBC::MBC5;
+		rumble = true;
+		RAM = true;
+		return true;
+	case 0x1E:
+		cartMBC = MBC::MBC5;
+		rumble = true;
+		RAM = true;
+		battery = true;
+		return true;
+	// Error
 	default:
 		return false;
 	}
 }
 bool gbMEM::setBanks(uint8_t code) {
-	banks = 0x0001;
-	banks = banks << (code);
+	banks = 0x0002;
+	banks <<= (code);
 	return true;
 }
 
@@ -244,7 +359,7 @@ bool gbMEM::setRam(uint8_t code) {
 		return false;
 	}
 	ram = new char[(int)ramBanks * 0x2000];
-	if (ramBanks > 0) {
+	if (ramBanks > 0 && battery) {
 		std::cout << "loading save - ";
 		std::ifstream file("SAVES/" + (game) + ".SAV", std::ios::in | std::ios::binary | std::ios::ate);
 		if (file.is_open())
@@ -263,7 +378,7 @@ bool gbMEM::setRam(uint8_t code) {
 }
 bool gbMEM::saveRam() {
 	if (ramBanks > 0 && battery) {
-		memcpy(ram + ramBank * 0x2000, MEM + 0xA000, 0x2000);
+		memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
 		std::ofstream file("SAVES/" + (game) + ".SAV");
 		file.open("SAVES/" + (game) + ".SAV", std::ios::out | std::ios::binary);
 		if (file.is_open())
@@ -271,11 +386,11 @@ bool gbMEM::saveRam() {
 			file.clear();
 			file.write((char*)ram, (int)ramBanks * 0x2000);
 			file.close();
-			std::cout << "Saved game \n\n";
+			std::cout << "Saved game \n";
 			return 1;
 		}
 		else {
-			std::cout << "failed to save \n\n";
+			std::cout << "failed to save \n";
 			return 0;
 		}
 	}

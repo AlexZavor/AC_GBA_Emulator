@@ -6,9 +6,9 @@ Basic old graphics		max - 57, min - 0
 No graphics 			max - 3,  min - 0
 No SDL_Renderer calls	max - 5,  min - 0
 Write to Array			max - 6,  min - 0
-render array once 		max - 59, min - 11
-pixel pusher 			max - 17, min - 2 (but adverage was like 3-4!)
-final design			max - 10.7, min - 4.1 (better when plugged in)
+Render array once 		max - 59, min - 11
+Pixel pusher 			max - 17, min - 2 (but adverage was like 3-4!)
+Final design			max - 10.7, min - 4.1 (better when plugged in)
 */
 // #define GREEN_PALLET
 
@@ -203,8 +203,6 @@ void gbPPU::drawBackground() {
 			break;
 		}
 		Vram[x][y] = pixel;
-        // SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
-        // SDL_RenderDrawPoint(renderer, x, y);
 	}
 }
 
@@ -233,7 +231,7 @@ void gbPPU::drawWindow() {
 	//draw Window on Vram
 	for (int x = 0; x < 160; x++) {
 		int y = dMEM[0xFF44];
-		int X = x + dMEM[0xFF4B]-7;
+		int X = x + (dMEM[0xFF4B]-7);
 		int Y = y + dMEM[0xFF4A];
 		if (Y >= 256) {
 			Y -= 256;
@@ -259,10 +257,8 @@ void gbPPU::drawWindow() {
 				((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
 				(((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2) + 1] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
 		}
-		if ((x - (dMEM[0xFF4B] - 7) <= 160) && (x - (dMEM[0xFF4B] - 7) > 0) && (y - dMEM[0xFF4A] < 144) && (y - dMEM[0xFF4A] >= 0)) {
+		if ((x - (dMEM[0xFF4B] - 7) < 160) && (x - (dMEM[0xFF4B] - 7) >= 0) && (y - dMEM[0xFF4A] < 144) && (y - dMEM[0xFF4A] >= 0)) {
 			Vram[x][y] = pixel;
-            // SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
-            // SDL_RenderDrawPoint(renderer, x, y);
 		}
 	}
 }
@@ -333,8 +329,6 @@ void gbPPU::drawSprites() {
 							break;
 						}
 						Vram[X][Y] = pixel;
-                        // SDL_SetRenderDrawColor(renderer, ~pixel<<6, ~pixel<<6, ~pixel<<6, 0xFF);
-                        // SDL_RenderDrawPoint(renderer, X, Y);
 					}
 				}
 			}

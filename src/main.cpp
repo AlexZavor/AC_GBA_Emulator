@@ -280,7 +280,9 @@ int main(int argc, char* argv[]) {
 				Uint64 end = SDL_GetPerformanceCounter();
 				float elapsedMS = (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
 				// Cap to 60 FPS
-				SDL_Delay((16.666f - elapsedMS));
+				if(16.666f - elapsedMS > 0){
+					SDL_Delay((Uint32)(16.666f - elapsedMS));
+				}
 
 				#ifdef FPS_COUNT
 					if(elapsedMS > 20){

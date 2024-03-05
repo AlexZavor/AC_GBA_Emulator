@@ -20,6 +20,7 @@ class gbMEM{
 		NONE,
 		MBC1,
 		MBC2,
+        MBC3,
 		MBC5,
 	    }MBC;
 
@@ -32,6 +33,7 @@ class gbMEM{
         bool battery;
         bool RAM;
         bool timer;
+        bool rumble;
 
         // Name of current game
         std::string game;
