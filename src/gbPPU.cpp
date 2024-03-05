@@ -21,6 +21,7 @@ gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu) {
 
 void gbPPU::drawLine(uint8_t line)
 {
+	//TODO: fix this whole thing really, break it into drawing and update ppu
     dMEM[0xFF44] = line;
 
 	if (line == 144) {
@@ -33,12 +34,12 @@ void gbPPU::drawLine(uint8_t line)
 			//vblank stat intterrupt
 		}
 	} 
-	else if (line < 144) {
-        
-		//Reading drawing
+	else if(line == 0){
 		dMEM[0xFF41] &= 0b11111100;
 		dMEM[0xFF0F] &= 0b11111110;	//V-blank disable
+	}
 
+	if (line < 144) {
         if (dMEM[0xFF40] & 0b00000001) {
             //Background and Window Enable
             drawBackground();
@@ -53,7 +54,7 @@ void gbPPU::drawLine(uint8_t line)
         }
 	}
 
-	if (line == dMEM[0xFF45]) {
+	if (dMEM[0xFF44] == dMEM[0xFF45]) {
 		//LYC == LY
 		dMEM[0xFF41] |= 0b00000100;
 		if (dMEM[0xFF41] & 0b01000000) {
@@ -63,7 +64,9 @@ void gbPPU::drawLine(uint8_t line)
 	else {
 		//LYC != LY
 		dMEM[0xFF41] &= 0b11111011;
-		dMEM[0xFF0F] &= 0b11111101;
+		if (dMEM[0xFF41] & 0b01000000) {
+			dMEM[0xFF0F] &= 0b11111101;
+		}
 	}
 }
 
@@ -231,8 +234,8 @@ void gbPPU::drawWindow() {
 	//draw Window on Vram
 	for (int x = 0; x < 160; x++) {
 		int y = dMEM[0xFF44];
-		int X = x + (dMEM[0xFF4B]-7);
-		int Y = y + dMEM[0xFF4A];
+		int X = x - (dMEM[0xFF4B]-7);
+		int Y = y - dMEM[0xFF4A];
 		if (Y >= 256) {
 			Y -= 256;
 		}
