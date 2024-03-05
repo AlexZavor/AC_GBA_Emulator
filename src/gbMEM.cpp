@@ -105,24 +105,22 @@ void gbMEM::write(uint16_t address, uint8_t data){
 				//ROM Bank Number
 				bank &= 0xFF00;
 				bank |= data;
+				// printf("Swap rom bank - MBC5 %d\n", bank);
 				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
 			}
 			else if (address < 0x4000) {
-				//ROM Bank Number
+				//ROM Bank Number high bit
 				bank &= 0x00FF;
-				bank |= ((uint16_t)(data&0x01))<<8;
+				bank |= ((uint16_t)(data))<<8;
 				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
 			}
 			else if (address < 0x6000) {
-				//RAM Bank Number / upper bits
-				printf("Swap ram bank - MBC5\n");
+				//RAM Bank Number
+				// printf("Swap ram bank - MBC5\n");
 				// Save old ram
 				memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
 				// Load new data
 				ramBank = data;
-				if (ramBank > ramBanks) {
-					ramBank = 0;
-				}
 				memcpy(MEM + 0xA000, ram + (ramBank * 0x2000), 0x2000);
 			}
 			else if (address < 0x8000) {
@@ -359,16 +357,16 @@ bool gbMEM::setRam(uint8_t code) {
 		return false;
 	}
 	ram = new char[(int)ramBanks * 0x2000];
-	if (ramBanks > 0 && battery) {
+	if (ramBanks && battery) {
 		std::cout << "loading save - ";
 		std::ifstream file("SAVES/" + (game) + ".SAV", std::ios::in | std::ios::binary | std::ios::ate);
 		if (file.is_open())
 		{
-			std::cout << "save loaded" << std::endl;
 			file.seekg(0, std::ios::beg);
 			file.read(ram, (int)ramBanks * 0x2000);
 			file.close();
 			memcpy(MEM + 0xA000, ram + (ramBank*0x2000), 0x2000);
+			std::cout << "save loaded" << std::endl;
 		}
 		else {
 			std::cout << "Save not found" << std::endl;

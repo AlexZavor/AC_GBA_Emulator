@@ -44,6 +44,7 @@ void gbEmulator::runFrame(inputData input) {
             CPU->timers(cycles);
 
             cyclecount -= cycles;
+            PPU->updatePPU(cyclecount);
         }
         //Draw line
         PPU->drawLine(line);

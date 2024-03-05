@@ -21,10 +21,9 @@ gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu) {
 
 void gbPPU::drawLine(uint8_t line)
 {
-	//TODO: fix this whole thing really, break it into drawing and update ppu
     dMEM[0xFF44] = line;
 
-	if (line == 144) {
+	if (line == 145) {
 		//turn on V-blank flag
 		dMEM[0xFF41] |= 0b00000001;
 		dMEM[0xFF41] &= 0b11111101;
@@ -54,6 +53,10 @@ void gbPPU::drawLine(uint8_t line)
         }
 	}
 
+}
+
+void gbPPU::updatePPU(int cycles) {
+	// Cycles is how many cycles are left in the line 456-0
 	if (dMEM[0xFF44] == dMEM[0xFF45]) {
 		//LYC == LY
 		dMEM[0xFF41] |= 0b00000100;
@@ -70,7 +73,8 @@ void gbPPU::drawLine(uint8_t line)
 	}
 }
 
-void gbPPU::renderFrame(){
+void gbPPU::renderFrame() {
+	// Credit to DOOMReboot on Github for the pixel pusher system! https://github.com/DOOMReboot
 	// The Back Buffer texture may be stored with an extra bit of width (pitch) on the video card in order to properly
     // align it in VRAM should the width not lie on the correct memory boundary (usually four bytes).
     int32_t pitch = 0;
@@ -85,7 +89,7 @@ void gbPPU::renderFrame(){
         // as it will always be a multiple of four
         pitch /= sizeof(uint32_t);
 
-        // Fill texture with randomly colored pixels
+        // Draw frame to texture
         for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
 			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
 				#ifdef GREEN_PALLET
@@ -130,10 +134,8 @@ void gbPPU::renderFrame(){
 			}
 		}
 
-        // Unlock the texture in VRAM to let the GPU know we are done writing to it
+        // Unlock the texture in VRAM and send to renderer!
         SDL_UnlockTexture(texture);
-
-        // Copy our texture in VRAM to the display framebuffer in VRAM
         SDL_RenderCopy(renderer, texture, NULL, NULL);
     }
 	return;
@@ -165,14 +167,8 @@ void gbPPU::drawBackground() {
 
 	for (int x = 0; x < 160; x++) {
 		int y = dMEM[0xFF44];
-		int X = x + dMEM[0xFF43];
-		int Y = y + dMEM[0xFF42];
-		if (Y >= 256) {
-			Y -= 256;
-		}
-		if (X >= 256) {
-			X -= 256;
-		}
+		int X = (x + dMEM[0xFF43])%256;
+		int Y = (y + dMEM[0xFF42])%256;
 		int tx = X / 8;
 		int ty = Y / 8;
 		uint8_t pixel;

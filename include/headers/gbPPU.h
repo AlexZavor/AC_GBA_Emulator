@@ -23,6 +23,7 @@ class gbPPU{
     public:
         gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu);
         void drawLine(uint8_t line);
+        void updatePPU(int cycles);
 
         void renderFrame();
 

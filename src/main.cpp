@@ -10,21 +10,22 @@
 #include "inputData.h"
 #include "gbEmulator.h"
 
+/*
+GB
+	PPU
+		work on update function
+		figure out flickering
+		yl=ylc?
+	MEM
+		clover requests rom bank 135??
+		lots of crashing
+	CPU
+GBC
+GBA
+*/
+
 #define GAME_DIR "ROMS/"
 #define SAVE_DIR "SAVES/"
-
-//Key definitions
-#define KEY_UP		SDLK_UP
-#define KEY_DOWN	SDLK_DOWN
-#define KEY_LEFT	SDLK_LEFT
-#define KEY_RIGHT	SDLK_RIGHT
-#define KEY_A		SDLK_z
-#define KEY_B		SDLK_x
-#define KEY_SEL		SDLK_a
-#define KEY_START	SDLK_s
-#define KEY_RB		SDLK_w
-#define KEY_LB		SDLK_q
-#define KEY_MENU	SDLK_ESCAPE
 
 #ifdef FPS_COUNT
 	float minTime = 200;

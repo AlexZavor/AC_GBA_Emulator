@@ -4743,7 +4743,7 @@ void gbCPU::Failure(int code) {switch (code) {
 
 void gbCPU::printInstruction()
 {
-    // printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
+    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
 	
 	if(MEM->flag){
 		printf("PC - %X \n", registers.pc);
