@@ -13,11 +13,8 @@
 /*
 GB
 	PPU
-		work on update function
-		figure out flickering
-		yl=ylc?
+		figure out flickering?
 	MEM
-		clover requests rom bank 135??
 		lots of crashing
 	CPU
 GBC

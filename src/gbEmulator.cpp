@@ -23,6 +23,7 @@ void gbEmulator::runFrame(inputData input) {
     {
         static int cyclecount = 0; 
         cyclecount += 456;
+        MEM->MEM[0xFF44] = line;
         while (cyclecount > 0)
         {   
             //Update joypad
@@ -47,7 +48,7 @@ void gbEmulator::runFrame(inputData input) {
             PPU->updatePPU(cyclecount);
         }
         //Draw line
-        PPU->drawLine(line);
+        PPU->drawLine();
     }
     PPU->renderFrame();
 }

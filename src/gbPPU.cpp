@@ -19,11 +19,9 @@ gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu) {
 	texture = textu;
 }
 
-void gbPPU::drawLine(uint8_t line)
-{
-    dMEM[0xFF44] = line;
+void gbPPU::drawLine() {
 
-	if (line == 145) {
+	if (dMEM[0xFF44] == 144) {
 		//turn on V-blank flag
 		dMEM[0xFF41] |= 0b00000001;
 		dMEM[0xFF41] &= 0b11111101;
@@ -32,13 +30,9 @@ void gbPPU::drawLine(uint8_t line)
 			dMEM[0xFF0F] |= 0b00000010;
 			//vblank stat intterrupt
 		}
-	} 
-	else if(line == 0){
-		dMEM[0xFF41] &= 0b11111100;
-		dMEM[0xFF0F] &= 0b11111110;	//V-blank disable
 	}
-
-	if (line < 144) {
+	
+	if (dMEM[0xFF44] < 144) {
         if (dMEM[0xFF40] & 0b00000001) {
             //Background and Window Enable
             drawBackground();
@@ -57,6 +51,33 @@ void gbPPU::drawLine(uint8_t line)
 
 void gbPPU::updatePPU(int cycles) {
 	// Cycles is how many cycles are left in the line 456-0
+	if(dMEM[0xFF44] < 144) {
+		if(cycles > (456-80)) {
+			// Mode 2: OAM Scan
+			dMEM[0xFF41] |= 0b00000010;
+			dMEM[0xFF41] &= 0b11111110;
+
+			if (dMEM[0xFF41] & 0b00100000) {
+				dMEM[0xFF0F] |= 0b00000010;
+				//OAM Scan stat intterrupt
+			}
+		}
+		else if(cycles > (456-200)) {
+			// Mode 3: Drawing
+			dMEM[0xFF41] |= 0b00000011;
+		}
+		else {
+			// Mode 0: H-Blank
+			dMEM[0xFF41] &= 0b11111100;
+
+			if (dMEM[0xFF41] & 0b00001000) {
+				dMEM[0xFF0F] |= 0b00000010;
+				//Hblank stat intterrupt
+			}
+		}
+	}
+
+
 	if (dMEM[0xFF44] == dMEM[0xFF45]) {
 		//LYC == LY
 		dMEM[0xFF41] |= 0b00000100;
@@ -138,6 +159,7 @@ void gbPPU::renderFrame() {
         SDL_UnlockTexture(texture);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
     }
+	memset(Vram,0,(160*144));
 	return;
 }
 
