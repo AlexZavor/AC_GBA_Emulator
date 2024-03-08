@@ -4643,6 +4643,11 @@ int gbCPU::interrupts(int cycles) {
 	return IntCycles;
 }
 
+void gbCPU::setColor()
+{
+	registers.a = 0x11;
+}
+
 void gbCPU::initCpu() {
 	registers = { {0x00,0xB0},{0x00,0x13},{0x00,0xd8},{0x01,0x4d},0xFFFE,0x0100 };
 	IME = 0; //Interrupt Master Enable

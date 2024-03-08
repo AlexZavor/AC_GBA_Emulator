@@ -73,6 +73,8 @@ class gbCPU{
 
         void timers(uint8_t clock);
         int interrupts(int cycles);
+
+        void setColor();
     
     private:
         //set registers to correct values

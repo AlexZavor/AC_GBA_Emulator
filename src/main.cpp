@@ -3,12 +3,12 @@
 #endif
 
 #include <stdio.h>
-#include <vector>
-#include "tinydir.h"
+#include "games.h"
 #include "SDL.h"
 #include "SDL_ttf.h"
 #include "inputData.h"
 #include "gbEmulator.h"
+#include "gbcEmulator.h"
 
 /*
 GB
@@ -18,6 +18,7 @@ GB
 		lots of crashing
 	CPU
 GBC
+	Lets get started
 GBA
 */
 
@@ -78,33 +79,6 @@ bool closeSDL(SDL_Window* window, SDL_Renderer* renderer, SDL_Texture* texture){
 	return true;
 }
 
-void loadGames(std::vector<std::string>* Roms){
-	tinydir_dir dir;
-    tinydir_open(&dir, "./ROMS/");
-
-    while (dir.has_next)
-    {
-        tinydir_file file;
-        tinydir_readfile(&dir, &file);
-
-        if((file.name)[0] != '.'){
-			uint8_t i = 0;
-			while (file.name[i] != '\0')
-			{
-				i++;
-			}
-			if(file.name[i-1] == 'b'){
-				Roms->push_back(file.name);
-			}
-        }
-
-        tinydir_next(&dir);
-    }
-
-    tinydir_close(&dir);
-
-}
-
 int main(int argc, char* argv[]) {
 	// The window we'll be rendering to
 	SDL_Window* window = NULL;
@@ -118,18 +92,20 @@ int main(int argc, char* argv[]) {
 	inputData input;
 	resetInputData(&input);
 	// List of games
-	std::vector<std::string> Roms;
-	loadGames(&Roms);
+	std::vector<game> Roms;
+	games_loadGames(&Roms);
 
 	if(initializeSDL(&window, &renderer, &texture)){
 		// Menu system
-		std::string Game;
+		game Game;
 		unsigned int page = 0;
 		unsigned int selection = 0;
 		bool menu = true;
 		
 		// Emulator
-		gbEmulator* Emulator;
+		gbEmulator* GBEmulator = nullptr;
+		gbcEmulator* GBCEmulator = nullptr;
+		gbEmulator* GBAEmulator = nullptr;
 
 		// Main loop logic
 		bool quit = false;
@@ -182,8 +158,17 @@ int main(int argc, char* argv[]) {
 						#ifdef FPS_COUNT
 							printf("max - %f, min - %f\n", maxTime, minTime);
 						#endif
-						if(Emulator != nullptr){
-							delete Emulator;
+						if(GBEmulator != nullptr){
+							delete GBEmulator;
+							GBEmulator = nullptr;
+						}
+						if(GBCEmulator != nullptr){
+							delete GBCEmulator;
+							GBCEmulator = nullptr;
+						}
+						if(GBAEmulator != nullptr){
+							delete GBAEmulator;
+							GBAEmulator = nullptr;
 						}
 						break;
 					}
@@ -222,17 +207,30 @@ int main(int argc, char* argv[]) {
 			if(menu){
 				SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 				SDL_RenderClear(renderer);
-				SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 				static TTF_Font* Sans = TTF_OpenFont("../fonts/Minecraft.ttf", 16);
 				unsigned int y = 5;
 				for (unsigned int i = 0; i < 13;i++) {
 					if (i + (page * 13) < Roms.size()) {
-						SDL_Color White = {255, 255, 255};
+						SDL_Color color;
+						SDL_Color Red   = {255,   0,   0};
+						SDL_Color Green = {  0, 255,   0};
+						SDL_Color Blue  = {  0,   0, 255};
+						switch (Roms[i + (page * 13)].system) {
+						case GB:
+							color = Red;
+							break;
+						case GBC:
+							color = Green;
+							break;
+						case GBA:
+							color = Blue;
+							break;
+						}
 
 						// as TTF_RenderText_Solid could only be used on
 						// SDL_Surface then you have to create the surface first
 						SDL_Surface* surfaceMessage =
-							TTF_RenderText_Solid(Sans, Roms[i + (page * 13)].c_str(), White); 
+							TTF_RenderText_Solid(Sans, Roms[i + (page * 13)].name.c_str(), color); 
 
 						// now you can convert it into a texture
 						SDL_Texture* Message = SDL_CreateTextureFromSurface(renderer, surfaceMessage);
@@ -240,7 +238,7 @@ int main(int argc, char* argv[]) {
 						SDL_Rect Message_rect; //create a rect
 						Message_rect.x = 10;  //controls the rect's x coordinate 
 						Message_rect.y = y+2; // controls the rect's y coordinte
-						Message_rect.w = Roms[i + (page * 13)].length()*5; // controls the width of the rect
+						Message_rect.w = Roms[i + (page * 13)].name.length()*5; // controls the width of the rect
 						Message_rect.h = 8; // controls the height of the rect
 						SDL_RenderCopy(renderer, Message, NULL, &Message_rect);
 
@@ -252,17 +250,38 @@ int main(int argc, char* argv[]) {
 					y += 10;
 				}
 
+				SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 				SDL_RenderDrawLine(renderer, 2, ((selection%13) * 10) + 8, 2, ((selection % 13) * 10) + 11);
 				SDL_RenderDrawPoint(renderer, 4, ((selection % 13) * 10) + 10);
 				// FillTri(2, ((selection%13) * 10) + 7, 2, ((selection % 13) * 10) + 11, 4, ((selection % 13) * 10) + 9);
 
 				if (input.A || input.sel || input.start) {
-					Game = GAME_DIR + Roms[selection];
-					//Create Emulator
-					Emulator = new gbEmulator(renderer, texture);
-					//Insert cartrage, if succsess, leave menu
-					if(Emulator->insertCart(Game)){
-						menu = false;
+					Game = Roms[selection];
+					switch (Game.system) {
+					case GB:
+						//Create Emulator
+						GBEmulator = new gbEmulator(renderer, texture);
+						//Insert cartrage, if succsess, leave menu
+						if(GBEmulator->insertCart(GAME_DIR + Game.name)){
+							menu = false;
+						}
+						break;
+					case GBC:
+						//Create Emulator
+						GBCEmulator = new gbcEmulator(renderer, texture);
+						//Insert cartrage, if succsess, leave menu
+						if(GBCEmulator->insertCart(GAME_DIR + Game.name)){
+							menu = false;
+						}
+						break;
+					case GBA:
+						//Create Emulator
+						GBAEmulator = new gbEmulator(renderer, texture);
+						//Insert cartrage, if succsess, leave menu
+						if(GBAEmulator->insertCart(GAME_DIR + Game.name)){
+							menu = false;
+						}
+						break;
 					}
 				}
 				SDL_RenderPresent( renderer );
@@ -271,7 +290,21 @@ int main(int argc, char* argv[]) {
 				Uint64 start = SDL_GetPerformanceCounter();
 
 				//Run Emulator for one frame
-				Emulator->runFrame(input);
+				switch (Game.system) {
+				case GB:
+					GBEmulator->runFrame(input);
+					break;
+				case GBC:
+					GBCEmulator->runFrame(input);
+					break;
+				case GBA:
+					GBAEmulator->runFrame(input);
+					break;	
+				default:
+					printf("Yikes, system not supported");
+					break;
+				}
+				
 				//Update screen
 				SDL_RenderPresent( renderer );
 
@@ -292,7 +325,15 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		delete Emulator;
+		if(GBEmulator != nullptr){
+			delete GBEmulator;
+		}
+		if(GBCEmulator != nullptr){
+			delete GBCEmulator;
+		}
+		if(GBAEmulator != nullptr){
+			delete GBAEmulator;
+		}
 	}
 
 	closeSDL(window, renderer, texture);
