@@ -29,6 +29,7 @@ Echo of 8kB Internal RAM
 
 gbMEM::gbMEM() {
     initMem();
+	color = false;
 }
 
 gbMEM::~gbMEM()
@@ -132,18 +133,6 @@ void gbMEM::write(uint16_t address, uint8_t data){
 		}
 		return;
 	}
-	// else if (address < 0xC000)
-	// {
-	// 	//Cartrage ram
-	// 	// if (RAMEnabled) {
-	// 	// 	ram[(address - 0xA000) + (0x4000 * rambank)];
-	// 	// }
-	// 	// else {
-	// 	// 	//Do nothing
-	// 	// 	std::cout << "ram not enabled" << std::endl;
-	// 	// }
-	// }
-	// else if (address < 0xD000);
 	// else if (address < 0xE000)
 	// {
 	// 	//Switching Work Ram (GBC)
@@ -161,6 +150,9 @@ void gbMEM::andWrite(uint16_t address, uint8_t data){
 	write(address, MEM[address] & data);
 }
 
+void gbMEM::setColor() {
+	color = true;
+}
 
 bool gbMEM::insertCart(std::string game){
 	std::streampos size;

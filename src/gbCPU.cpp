@@ -2,8 +2,6 @@
 
 // #define LOGFILE
 
-//TODO:
-
 #ifdef LOGFILE
 #include <fstream>
 std::ofstream myfile;

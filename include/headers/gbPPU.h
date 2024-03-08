@@ -5,11 +5,7 @@
 #include "SDL.h"
 #include "gbMEM.h"
 #include <vector>
-
-#define SCALE 4
-//Screen dimension constants
-#define SCREEN_WIDTH (160 * SCALE)
-#define SCREEN_HEIGHT (144 * SCALE)
+#include "globals.h"
 
 class gbPPU{
     private:

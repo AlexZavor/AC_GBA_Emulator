@@ -7,13 +7,13 @@
 #include "inputData.h"
 #include "gbMEM.h"
 #include "gbCPU.h"
-#include "gbPPU.h"
+#include "gbcPPU.h"
 
 class gbcEmulator{
     private:
         gbMEM* MEM;
         gbCPU* CPU;
-        gbPPU* PPU;
+        gbcPPU* PPU;
     public:
         //Constructor. should initialize things like memory and prepare for first instruction
         gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture);

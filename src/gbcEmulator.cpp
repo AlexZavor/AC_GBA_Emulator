@@ -4,7 +4,7 @@ gbcEmulator::gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     MEM = new gbMEM();
     CPU = new gbCPU(MEM);
     CPU->setColor();
-    PPU = new gbPPU(MEM, renderer, texture);
+    PPU = new gbcPPU(MEM, renderer, texture);
 }
 
 gbcEmulator::~gbcEmulator()

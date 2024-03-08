@@ -35,6 +35,10 @@ class gbMEM{
         bool timer;
         bool rumble;
 
+        
+        // if color game boy
+        bool color = false;
+
         // Name of current game
         std::string game;
 
@@ -52,6 +56,10 @@ class gbMEM{
 
         // insert and save a cart to memory
         bool insertCart(std::string game);
+
+        // set memory as for a game boy color        
+        void setColor();
+
 
     private:
         // initalize starting memory (mostly from nintendo logo)

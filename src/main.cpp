@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include "games.h"
+#include "globals.h"
 #include "SDL.h"
 #include "SDL_ttf.h"
 #include "inputData.h"
@@ -18,12 +19,15 @@ GB
 		lots of crashing
 	CPU
 GBC
-	Lets get started
+	PPU
+		Most work to be done!
+	MEM
+		swithcing work ram banks
+	CPU
+		Hopefully working fine?
 GBA
 */
 
-#define GAME_DIR "ROMS/"
-#define SAVE_DIR "SAVES/"
 
 #ifdef FPS_COUNT
 	float minTime = 200;
