@@ -5,6 +5,7 @@ gbcEmulator::gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     CPU = new gbCPU(MEM);
     CPU->setColor();
     PPU = new gbcPPU(MEM, renderer, texture);
+    prevWbank = 1;
 }
 
 gbcEmulator::~gbcEmulator()
@@ -47,6 +48,17 @@ void gbcEmulator::runFrame(inputData input) {
 
             cyclecount -= cycles;
             PPU->updatePPU(cyclecount);
+
+            // Wram check
+            if(prevWbank != MEM->MEM[0xFF70]){
+                prevWbank = MEM->MEM[0xFF70];
+                MEM->swapWramBank(prevWbank);
+            }
+            // Vram check
+            if(prevVbank != MEM->MEM[0xFF4F]){
+                prevVbank = MEM->MEM[0xFF4F];
+                MEM->swapVramBank(prevVbank);
+            }
         }
         //Draw line
         PPU->drawLine();

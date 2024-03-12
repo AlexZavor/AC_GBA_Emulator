@@ -15,6 +15,11 @@ class gbMEM{
     private:
         char* cartrage;
         char* ram;
+        
+        uint8_t Wram[0x8000];
+        uint8_t WramBank = 1;
+        uint8_t Vram[0x4000];
+        uint8_t VramBank = 1;
 
         typedef enum{
 		NONE,
@@ -59,6 +64,10 @@ class gbMEM{
 
         // set memory as for a game boy color        
         void setColor();
+        // Swap Wram bank
+        bool swapWramBank(uint8_t bank);
+        // Swap Vram bank
+        bool swapVramBank(uint8_t bank);
 
 
     private:

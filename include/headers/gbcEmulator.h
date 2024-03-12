@@ -14,6 +14,9 @@ class gbcEmulator{
         gbMEM* MEM;
         gbCPU* CPU;
         gbcPPU* PPU;
+
+        uint8_t prevWbank;
+        uint8_t prevVbank;
     public:
         //Constructor. should initialize things like memory and prepare for first instruction
         gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture);

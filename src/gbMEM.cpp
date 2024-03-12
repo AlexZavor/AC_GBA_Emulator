@@ -133,12 +133,6 @@ void gbMEM::write(uint16_t address, uint8_t data){
 		}
 		return;
 	}
-	// else if (address < 0xE000)
-	// {
-	// 	//Switching Work Ram (GBC)
-	// 	// Wram[(address - 0xC000) + (WramBank * 0x1000)] = data;
-	// }
-	// else if (address < 0xFE00);
 	else{
 		MEM[address] = data;
 	}
@@ -191,6 +185,7 @@ bool gbMEM::insertCart(std::string game){
 }
 
 void gbMEM::initMem() {
+	WramBank = 1;
 	cartMBC = MBC::NONE;
 	RAMEnabled = false;
 	bank = 1;
@@ -385,4 +380,31 @@ bool gbMEM::saveRam() {
 		}
 	}
 	return 1;
+}
+
+bool gbMEM::swapWramBank(uint8_t bank)
+{
+	// printf("Swap Wram bank - GBC\n");
+	// Save old ram
+	memcpy(Wram + (WramBank * 0x1000), MEM + 0xD000, 0x1000);
+	// Load new data
+	WramBank = bank;
+	if (WramBank == 0) {
+		WramBank = 1;
+	} else if (WramBank > 7) {
+		printf("Whoops, thats an Wram Error\n");
+		return false;
+	}
+	memcpy(MEM + 0xD000, Wram + (WramBank * 0x1000), 0x1000);
+	return true;
+}
+bool gbMEM::swapVramBank(uint8_t bank)
+{
+	// printf("Swap Vram bank - GBC\n");
+	// Save old ram
+	memcpy(Vram + (VramBank * 0x2000), MEM + 0x8000, 0x2000);
+	// Load new data
+	VramBank = (bank & 0x01);
+	memcpy(MEM + 0x8000, Vram + (VramBank * 0x2000), 0x2000);
+	return true;
 }

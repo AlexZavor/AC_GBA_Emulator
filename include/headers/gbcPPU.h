@@ -7,6 +7,37 @@
 #include <vector>
 #include "globals.h"
 
+typedef struct {
+    union{
+        struct{
+            uint8_t high0;
+            uint8_t low0;
+        };
+        uint16_t color0;
+    };
+    union{
+        struct{
+            uint8_t high1;
+            uint8_t low1;
+        };
+        uint16_t color1;
+    };
+    union{
+        struct{
+            uint8_t high2;
+            uint8_t low2;
+        };
+        uint16_t color2;
+    };
+    union{
+        struct{
+            uint8_t high3;
+            uint8_t low3;
+        };
+        uint16_t color3;
+    };
+}pallet;
+
 class gbcPPU{
     private:
         gbMEM* MEM;
@@ -14,7 +45,10 @@ class gbcPPU{
         SDL_Renderer* renderer;
         SDL_Texture* texture;
 
-        uint8_t Vram[160][144];
+        uint16_t Vram[160][144];
+        
+        pallet BGColorPallet[8];
+        pallet OBJCollorPallet[8];
 
     public:
         gbcPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu);
