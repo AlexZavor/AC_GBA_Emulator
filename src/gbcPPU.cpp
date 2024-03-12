@@ -21,6 +21,8 @@ void gbcPPU::drawLine() {
 	}
 	
 	if (dMEM[0xFF44] < 144) {
+		// Save Vram before drawing
+		MEM->saveVram();
         if (dMEM[0xFF40] & 0b00000001) {
             //Background and Window Enable
             drawBackground();
@@ -184,7 +186,12 @@ void gbcPPU::renderFrame() {
         // Draw frame to texture
         for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
 			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
-                pixelBuffer[(x*(SCREEN_WIDTH)) + y] = Vram[y/SCALE][x/SCALE];
+				uint32_t pixel =  Vram[y/SCALE][x/SCALE];
+				uint16_t red = (pixel&0x0001 << 4) | (pixel&0x0002 << 2) | (pixel&0x0004) | (pixel&0x0008 >> 2) | (pixel&0x0010 >> 4);
+				uint16_t green = ((pixel&0x0020 << 4) | (pixel&0x0040 << 2) | (pixel&0x0080) | (pixel&0x0100 >> 2) | (pixel&0x0200 >> 4))>>5;
+				uint16_t blue = ((pixel&0x0400 << 4) | (pixel&0x0800 << 2) | (pixel&0x1000) | (pixel&0x2000 >> 2) | (pixel&0x4000 >> 4))>>10;
+				pixel = (red << 19) | (green << 11) | (blue << 3);
+                pixelBuffer[(x*(SCREEN_WIDTH)) + y] =pixel;
 			}
 		}
 
@@ -201,22 +208,24 @@ void gbcPPU::drawBackground() {
 	bool sign;
 	if (dMEM[0xFF40] & 0b00010000) {
 		//unsigned data starting at $8000
-		addressBase = 0x8000;
+		// addressBase = 0x8000;
+		addressBase = 0x0000;
 		sign = 0;
 	}
 	else {
 		//signed data starting at $9000
-		addressBase = 0x9000;
+		// addressBase = 0x9000;
+		addressBase = 0x1000;
 		sign = 1;
 	}
 	int map;
 	if (dMEM[0xFF40] & 0b00001000) {
 		//Tile map starts at $9C00
-		map = 0x9C00;
+		map = 0x9C00 - 0x8000;
 	}
 	else {
 		//Tile map starts at $9800
-		map = 0x9800;
+		map = 0x9800 - 0x8000;
 	}
 
 
@@ -226,32 +235,44 @@ void gbcPPU::drawBackground() {
 		int Y = (y + dMEM[0xFF42])%256;
 		int tx = X / 8;
 		int ty = Y / 8;
-		uint8_t pixel;
+		uint16_t pixel;
+		// Atribute pulled from other vram bank
+		uint8_t attr = MEM->Vram[map + (ty * 32) + tx + 0x2000];
+		bool bank = (attr&0b00001000) ? 1 : 0;
+		if (attr & 0b00100000) {
+			//X flip
+			X = 7 - X;
+		}
+		if (attr & 0b01000000) {
+			//Y flip
+			Y = 7 - Y;
+		}
+		uint8_t pal = attr&0x07;
 		if (sign) {
-			signed char tile = (signed)dMEM[map + (ty * 32) + tx];
+			signed char tile = (signed)MEM->Vram[map + (ty * 32) + tx];
 			pixel =
-				((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
-				(((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2) + 1] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
+				((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
+				(((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + 1 + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
 		}
 		else {
-			unsigned char tile = (unsigned)dMEM[map + (ty * 32) + tx];
+			unsigned char tile = (unsigned)MEM->Vram[map + (ty * 32) + tx];
 			pixel =
-				((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
-				(((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2) + 1] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
+				((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
+				(((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + 1 + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
 		}
 		switch (pixel)
 		{
 		case 0:
-			pixel = (dMEM[0xFF47] & 0b00000011);
+			pixel = BGColorPallet[pal].color0;
 			break;
 		case 1:
-			pixel = (dMEM[0xFF47] & 0b00001100) >> 2;
+			pixel = BGColorPallet[pal].color1;
 			break;
 		case 2:
-			pixel = (dMEM[0xFF47] & 0b00110000) >> 4;
+			pixel = BGColorPallet[pal].color2;
 			break;
 		case 3:
-			pixel = (dMEM[0xFF47] & 0b11000000) >> 6;
+			pixel = BGColorPallet[pal].color3;
 			break;
 		default:
 			break;

@@ -393,7 +393,8 @@ bool gbMEM::swapWramBank(uint8_t bank)
 		WramBank = 1;
 	} else if (WramBank > 7) {
 		printf("Whoops, thats an Wram Error\n");
-		return false;
+		WramBank %= 7;
+		// return false;
 	}
 	memcpy(MEM + 0xD000, Wram + (WramBank * 0x1000), 0x1000);
 	return true;
@@ -406,5 +407,11 @@ bool gbMEM::swapVramBank(uint8_t bank)
 	// Load new data
 	VramBank = (bank & 0x01);
 	memcpy(MEM + 0x8000, Vram + (VramBank * 0x2000), 0x2000);
+	return true;
+}
+
+bool gbMEM::saveVram()
+{
+	memcpy(Vram + (VramBank * 0x2000), MEM + 0x8000, 0x2000);
 	return true;
 }

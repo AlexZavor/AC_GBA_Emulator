@@ -4719,7 +4719,9 @@ void gbCPU::Failure(int code) {switch (code) {
 	case 1:
 		std::cout << "Hit invalid Opcode!" << std::endl;
 		std::cout << ("PC: 0x");
-		std::cout << std::hex << registers.pc << std::endl;
+		std::cout << std::hex << registers.pc << std::endl << "Code: 0x";
+		std::cout << std::hex << (int)dMEM[registers.pc] << std::endl;
+		registers.pc++;
 		break;
 	case 2:
 		std::cout << "Failed CB Instruction! Code: 0xCB 0x";

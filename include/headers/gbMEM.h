@@ -12,14 +12,15 @@ class gbMEM{
         uint8_t MEM[0x10000];
         bool flag = 0;
 
+        uint8_t Vram[0x4000];
+        uint8_t VramBank = 1;
+
     private:
         char* cartrage;
         char* ram;
         
         uint8_t Wram[0x8000];
         uint8_t WramBank = 1;
-        uint8_t Vram[0x4000];
-        uint8_t VramBank = 1;
 
         typedef enum{
 		NONE,
@@ -68,6 +69,7 @@ class gbMEM{
         bool swapWramBank(uint8_t bank);
         // Swap Vram bank
         bool swapVramBank(uint8_t bank);
+        bool saveVram();
 
 
     private:
