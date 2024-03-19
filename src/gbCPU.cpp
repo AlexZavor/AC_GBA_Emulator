@@ -4643,7 +4643,10 @@ int gbCPU::interrupts(int cycles) {
 
 void gbCPU::setColor()
 {
-	registers.a = 0x11;
+	registers = { {0x11,0x00},{0x00,0x00},{0xFF,0x56},{0x00,0x0d},0xFFFE,0x0100 };
+	setZ(1);
+	dMEM[0xFF46] = 0x00;
+	DMA = 0x00;
 }
 
 void gbCPU::initCpu() {
@@ -4748,8 +4751,15 @@ void gbCPU::Failure(int code) {switch (code) {
 
 void gbCPU::printInstruction()
 {
-    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
+
+	static bool print = 1;
+
+	if(print){
+	    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
+	}
 	
+	if(registers.pc == 0x294f){print = false;}
+
 	if(MEM->flag){
 		printf("PC - %X \n", registers.pc);
 		MEM->flag = 0;

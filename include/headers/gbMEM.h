@@ -70,6 +70,10 @@ class gbMEM{
         // Swap Vram bank
         bool swapVramBank(uint8_t bank);
         bool saveVram();
+        
+        // GBC vram DMA transfer functions
+        bool vRamDMAFull(uint16_t size);
+        bool vramDMALine();
 
 
     private:

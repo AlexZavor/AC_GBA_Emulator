@@ -48,12 +48,14 @@ class gbcPPU{
         uint16_t Vram[160][144];
         
         pallet BGColorPallet[8];
-        pallet OBJCollorPallet[8];
+        pallet OBJColorPallet[8];
+
+        uint8_t lastDMA;
 
     public:
         gbcPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu);
         void drawLine();
-        void updatePPU(int cycles);
+        uint32_t updatePPU(int cycles);
 
         void renderFrame();
 

@@ -5,6 +5,9 @@ gbcPPU::gbcPPU(gbMEM *memory, SDL_Renderer *rend, SDL_Texture *textu) {
     dMEM = memory->MEM;
     renderer = rend;
 	texture = textu;
+	memset(BGColorPallet,0xFF, sizeof(BGColorPallet));
+	memset(OBJColorPallet,0xFF, sizeof(OBJColorPallet));
+	lastDMA = dMEM[0xff55];
 }
 
 void gbcPPU::drawLine() {
@@ -28,7 +31,7 @@ void gbcPPU::drawLine() {
             drawBackground();
             if (dMEM[0xFF40] & 0b00100000) {
                 //Window Enable
-                // drawWindow();
+                drawWindow();
             }
         }
         if (dMEM[0xFF40] & 0b00000010) {
@@ -38,7 +41,9 @@ void gbcPPU::drawLine() {
 	}
 }
 
-void gbcPPU::updatePPU(int cycles) {
+uint32_t gbcPPU::updatePPU(int cycles) {
+	uint32_t time = 0;
+
 	// Cycles is how many cycles are left in the line 456-0
 	if(dMEM[0xFF44] < 144) {
 		if(cycles > (456-80)) {
@@ -82,11 +87,11 @@ void gbcPPU::updatePPU(int cycles) {
 		}
 	}
 
+	// load color pallets
     static uint8_t lastDat = dMEM[0xFF69];
     if(dMEM[0xFF69] != lastDat){
         lastDat = dMEM[0xFF69];
-		// *(BGColorPallet + dMEM[0xFF68]) = lastDat; 
-        pallet* pal = BGColorPallet + (dMEM[0xFF68] & 0x38);
+        pallet* pal = BGColorPallet + ((dMEM[0xFF68] & 0x38) >> 3);
         switch (dMEM[0xFF68] & 0x07)
         {
         case 0:
@@ -113,10 +118,6 @@ void gbcPPU::updatePPU(int cycles) {
         case 7:
             pal->high3 = lastDat;
             break;
-        
-        default:
-            printf("Wat? color pallet weirdness\n");
-            break;
         }
         if(dMEM[0xFF68] & 0x80){
             dMEM[0xFF68]++;
@@ -128,7 +129,7 @@ void gbcPPU::updatePPU(int cycles) {
     if(dMEM[0xFF6B] != lastObj){
         lastObj = dMEM[0xFF6B];
 		// *(BGColorPallet + dMEM[0xFF68]) = lastObj; 
-        pallet* pal = BGColorPallet + (dMEM[0xFF6A] & 0x38);
+        pallet* pal = OBJColorPallet + ((dMEM[0xFF6A] & 0x38) >> 3);
         switch (dMEM[0xFF6A] & 0x07)
         {
         case 0:
@@ -165,6 +166,25 @@ void gbcPPU::updatePPU(int cycles) {
             dMEM[0xFF6A] &= 0b10111111;
         }
     }
+
+	// Check for DMA Transfer
+	if(dMEM[0xFF55] != lastDMA){
+		lastDMA = dMEM[0xFF55];
+		if(lastDMA & 0x80){
+			// H-blank DMA
+			printf("H-blank dma\n");
+			lastDMA = 0xFF;
+		} else {
+			// Instant DMA
+			uint16_t size = ((lastDMA & 0x7f) + 1);
+			MEM->vRamDMAFull(size * 0x10);
+			time += size;
+			lastDMA = 0xFF;
+			dMEM[0xFF55] = 0xFF;
+		}
+	}
+
+	return time;
 }
 
 void gbcPPU::renderFrame() {
@@ -264,15 +284,19 @@ void gbcPPU::drawBackground() {
 		{
 		case 0:
 			pixel = BGColorPallet[pal].color0;
+			// pixel = 0x0000;
 			break;
 		case 1:
 			pixel = BGColorPallet[pal].color1;
+			// pixel = 0x5555;
 			break;
 		case 2:
 			pixel = BGColorPallet[pal].color2;
+			// pixel = 0xaaaa;
 			break;
 		case 3:
 			pixel = BGColorPallet[pal].color3;
+			// pixel = 0xffff;
 			break;
 		default:
 			break;
@@ -286,12 +310,14 @@ void gbcPPU::drawWindow() {
 	bool sign;
 	if (dMEM[0xFF40] & 0b00010000) {
 		//unsigned data starting at $8000
-		addressBase = 0x8000;
+		// addressBase = 0x8000;
+		addressBase = 0x0000;
 		sign = 0;
 	}
 	else {
 		//signed data starting at $9000
-		addressBase = 0x9000;
+		// addressBase = 0x9000;
+		addressBase = 0x1000;
 		sign = 1;
 	}
 	int map;
@@ -320,19 +346,52 @@ void gbcPPU::drawWindow() {
 		int tx = X / 8;
 		int ty = Y / 8;
 		uint8_t pixel;
+		// Atribute pulled from other vram bank
+		uint8_t attr = MEM->Vram[map + (ty * 32) + tx + 0x2000];
+		bool bank = (attr&0b00001000) ? 1 : 0;
+		if (attr & 0b00100000) {
+			//X flip
+			X = 7 - X;
+		}
+		if (attr & 0b01000000) {
+			//Y flip
+			Y = 7 - Y;
+		}
+		uint8_t pal = attr&0x07;
 		if (sign) {
-			signed char tile = (signed)dMEM[map + (ty * 32) + tx];
+			signed char tile = (signed)MEM->Vram[map + (ty * 32) + tx];
 			pixel =
-				((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
-				(((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2) + 1] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
+				((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
+				(((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + 1 + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
 		}
 		else {
-			unsigned char tile = (unsigned)dMEM[map + (ty * 32) + tx];
+			unsigned char tile = (unsigned)MEM->Vram[map + (ty * 32) + tx];
 			pixel =
-				((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
-				(((dMEM[addressBase + (tile * 16) + ((Y % 8) * 2) + 1] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
+				((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) >> (7 - (X % 8))) +
+				(((MEM->Vram[addressBase + (tile * 16) + ((Y % 8) * 2) + 1 + (bank*0x2000)] & (0b00000001 << (7 - (X % 8)))) * 2) >> (7 - (X % 8)));
 		}
 		if ((x - (dMEM[0xFF4B] - 7) < 160) && (x - (dMEM[0xFF4B] - 7) >= 0) && (y - dMEM[0xFF4A] < 144) && (y - dMEM[0xFF4A] >= 0)) {
+			switch (pixel)
+			{
+			case 0:
+				pixel = BGColorPallet[pal].color0;
+				// pixel = 0x0000;
+				break;
+			case 1:
+				pixel = BGColorPallet[pal].color1;
+				// pixel = 0x5555;
+				break;
+			case 2:
+				pixel = BGColorPallet[pal].color2;
+				// pixel = 0xaaaa;
+				break;
+			case 3:
+				pixel = BGColorPallet[pal].color3;
+				// pixel = 0xffff;
+				break;
+			default:
+				break;
+			}
 			Vram[x][y] = pixel;
 		}
 	}

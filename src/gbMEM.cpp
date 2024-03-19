@@ -105,7 +105,8 @@ void gbMEM::write(uint16_t address, uint8_t data){
 			else if (address < 0x3000) {
 				//ROM Bank Number
 				bank &= 0xFF00;
-				bank |= data;
+				bank += data;
+				bank %= banks;
 				// printf("Swap rom bank - MBC5 %d\n", bank);
 				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
 			}
@@ -146,6 +147,17 @@ void gbMEM::andWrite(uint16_t address, uint8_t data){
 
 void gbMEM::setColor() {
 	color = true;
+	MEM[0xFF4C] = 0xC0;
+	MEM[0xFF4D] = 0xfe;
+	MEM[0xFF4F] = 0xfe;
+	MEM[0xFF51] = 0xff;
+	MEM[0xFF52] = 0xff;
+	MEM[0xFF53] = 0xff;
+	MEM[0xFF54] = 0xff;
+	MEM[0xFF55] = 0xff;
+	MEM[0xFF56] = 0x3e;
+	MEM[0xFF6C] = 0x00;
+	MEM[0xFF70] = 0xf8;
 }
 
 bool gbMEM::insertCart(std::string game){
@@ -391,11 +403,8 @@ bool gbMEM::swapWramBank(uint8_t bank)
 	WramBank = bank;
 	if (WramBank == 0) {
 		WramBank = 1;
-	} else if (WramBank > 7) {
-		printf("Whoops, thats an Wram Error\n");
-		WramBank %= 7;
-		// return false;
 	}
+	WramBank &= 0x7;
 	memcpy(MEM + 0xD000, Wram + (WramBank * 0x1000), 0x1000);
 	return true;
 }
@@ -413,5 +422,16 @@ bool gbMEM::swapVramBank(uint8_t bank)
 bool gbMEM::saveVram()
 {
 	memcpy(Vram + (VramBank * 0x2000), MEM + 0x8000, 0x2000);
+	return true;
+}
+
+bool gbMEM::vRamDMAFull(uint16_t size) {
+	uint16_t dest = ((uint16_t)MEM[0xFF51] << 8) + (uint16_t)MEM[0xFF52];
+	dest &= 0x1FF0;
+	dest |= 0x8000;
+	uint16_t source = ((uint16_t)MEM[0xFF53] << 8) + (uint16_t)MEM[0xFF54];
+	source &= 0xFFF0;
+
+    memcpy(MEM + dest, MEM + source, size);
 	return true;
 }

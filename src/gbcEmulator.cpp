@@ -43,11 +43,11 @@ void gbcEmulator::runFrame(inputData input) {
             // Run CPU until finish line
             // CPU->printInstruction();
             uint8_t cycles = (CPU->instruction())/2;
+            cyclecount -= PPU->updatePPU(cyclecount);
             cycles += (CPU->interrupts(cycles))/2;
             CPU->timers(cycles);
 
             cyclecount -= cycles;
-            PPU->updatePPU(cyclecount);
 
             // Wram check
             if(prevWbank != MEM->MEM[0xFF70]){
