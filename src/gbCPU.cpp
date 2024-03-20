@@ -4644,6 +4644,8 @@ int gbCPU::interrupts(int cycles) {
 void gbCPU::setColor()
 {
 	registers = { {0x11,0x00},{0x00,0x00},{0xFF,0x56},{0x00,0x0d},0xFFFE,0x0100 };
+	registers.a = 0x11;
+	registers.b = 0x00;
 	setZ(1);
 	dMEM[0xFF46] = 0x00;
 	DMA = 0x00;
@@ -4758,7 +4760,7 @@ void gbCPU::printInstruction()
 	    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
 	}
 	
-	if(registers.pc == 0x294f){print = false;}
+	// if(registers.pc == 0x294f){print = false;}
 
 	if(MEM->flag){
 		printf("PC - %X \n", registers.pc);
@@ -4766,7 +4768,7 @@ void gbCPU::printInstruction()
 	}
 
 	#ifdef LOGFILE
-	static bool writing = 0;
+	static bool writing = 1;
 
 	if(registers.pc == 0x6a15){
 		writing = 1;
@@ -4776,7 +4778,7 @@ void gbCPU::printInstruction()
 		myfile << " | AF-" << std::hex << registers.af << " BC-" << std::hex << registers.bc << " DE-" << std::hex << registers.de << " HL-" << std::hex << registers.hl;
 		myfile << std::endl;
 	}
-	if(dMEM[registers.pc] == 0xFF){
+	if(registers.pc == 0x75a3){
 		writing = 0;
 	}
 	#endif
