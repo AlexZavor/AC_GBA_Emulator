@@ -45,6 +45,8 @@ class gbcPPU{
         SDL_Renderer* renderer;
         SDL_Texture* texture;
 
+        uint8_t BGPriority[160];
+        uint8_t line[160];
         uint16_t Vram[160][144];
         
         pallet BGColorPallet[8];

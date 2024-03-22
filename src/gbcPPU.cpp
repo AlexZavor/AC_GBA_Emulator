@@ -27,14 +27,11 @@ void gbcPPU::drawLine() {
 	if (dMEM[0xFF44] < 144) {
 		// Save Vram before drawing
 		MEM->saveVram();
-        if (dMEM[0xFF40] & 0b00000001) {
-            //Background and Window Enable
-            drawBackground();
-            if (dMEM[0xFF40] & 0b00100000) {
-                //Window Enable
-                drawWindow();
-            }
-        }
+		drawBackground();
+		if (dMEM[0xFF40] & 0b00100000) {
+			//Window Enable
+			drawWindow();
+		}
         if (dMEM[0xFF40] & 0b00000010) {
             //Sprite Enable
             drawSprites();
@@ -296,6 +293,8 @@ void gbcPPU::drawBackground() {
 				((MEM->Vram[addressBase + (tile * 16) + yBit + (bank*0x2000)] & (0b00000001 << xBit)) >> xBit) +
 				(((MEM->Vram[addressBase + (tile * 16) + yBit + 1 + (bank*0x2000)] & (0b00000001 << xBit)) * 2) >> xBit);
 		}
+		BGPriority[x] = (attr&0x80);
+		line[x] = pixel;
 		switch (pixel)
 		{
 		case 0:
@@ -384,7 +383,8 @@ void gbcPPU::drawWindow() {
 				((MEM->Vram[addressBase + (tile * 16) + yBit + (bank*0x2000)] & (0b00000001 << xBit)) >> xBit) +
 				(((MEM->Vram[addressBase + (tile * 16) + yBit + 1 + (bank*0x2000)] & (0b00000001 << xBit)) * 2) >> xBit);
 		}
-		if ((x - (dMEM[0xFF4B] - 7) < 160) && (x - (dMEM[0xFF4B] - 7) >= 0) && (y - dMEM[0xFF4A] < 144) && (y - dMEM[0xFF4A] >= 0)) {
+		if ((x - (dMEM[0xFF4B] - 7) < 160) && (x - (dMEM[0xFF4B] - 7) >= 0) && (y - dMEM[0xFF4A] < 144) && (y - dMEM[0xFF4A] >= 0)) {	
+			line[x] = pixel;
 			switch (pixel)
 			{
 			case 0:
@@ -433,6 +433,7 @@ void gbcPPU::drawSprites() {
 		int ypos = dMEM[0xFE00 + (s * 4)] - 16;
 		int xpos = dMEM[(0xFE00 + (s * 4)) + 1] - 8;
 		uint8_t tile = dMEM[(0xFE00 + (s * 4)) + 2];
+		if(size){tile &= 0xFE;}
 		uint8_t flags = dMEM[(0xFE00 + (s * 4)) + 3];
 		int r = y - ypos;
 		uint8_t pal = flags&0x07;
@@ -456,11 +457,12 @@ void gbcPPU::drawSprites() {
 			uint16_t pixel =
 				((MEM->Vram[((tile) * 16) + (Y * 2) + (bank*0x2000)] & (0b00000001 << (7 - X))) >> (7 - X)) +
 				(((MEM->Vram[((tile) * 16) + (Y * 2) + 1 + (bank*0x2000)] & (0b00000001 << (7 - X))) * 2) >> (7 - X));
-			if (pixel != 0) {
+			if (pixel != 0) { // ignore "transparent" pixels
 				uint8_t Y = ypos + r;
 				uint8_t X = xpos + bit;
 				if (Y >= 0 && Y < 144 && X >= 0 && X < 160) {
-					if ((!(flags & 0b10000000)) || Vram[X][Y] == 0) {
+					bool objPriority = (dMEM[0xFF40]&0x01) && ((flags & 0x80) || (BGPriority[X]));
+					if ((!objPriority) || (line[X] == 0)) {
 						switch (pixel)
 						{
 						case 1:
@@ -471,8 +473,6 @@ void gbcPPU::drawSprites() {
 							break;
 						case 3:
 							pixel = OBJColorPallet[pal].color3;
-							break;
-						default:
 							break;
 						}
 						Vram[X][Y] = pixel;
