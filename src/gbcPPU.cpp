@@ -230,7 +230,7 @@ void gbcPPU::drawWindow() {
 	}
 	//draw Window on Vram
 	for (int x = 0; x < 160; x++) {
-		int y = dMEM[0xFF44];
+		static int y = dMEM[0xFF44];
 		int X = x - (dMEM[0xFF4B]-7);
 		int Y = y - dMEM[0xFF4A];
 		if (Y >= 256) {
@@ -346,8 +346,8 @@ void gbcPPU::drawSprites() {
 				((MEM->Vram[((tile) * 16) + (Y * 2) + (bank*0x2000)] & (0b00000001 << (7 - X))) >> (7 - X)) +
 				(((MEM->Vram[((tile) * 16) + (Y * 2) + 1 + (bank*0x2000)] & (0b00000001 << (7 - X))) * 2) >> (7 - X));
 			if (pixel != 0) { // ignore "transparent" pixels
-				uint8_t Y = ypos + r;
-				uint8_t X = xpos + bit;
+				Y = ypos + r;
+				X = xpos + bit;
 				if (Y >= 0 && Y < 144 && X >= 0 && X < 160) {
 					bool objPriority = ((dMEM[0xFF40]&0x01) && ((flags & 0x80) || (BGPriority[X])));
 					if ((!objPriority) || (line[X] == 0)) {

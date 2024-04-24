@@ -20,11 +20,8 @@ GB
 	CPU
 GBC
 	PPU
-		Most work to be done!
-	MEM
-		swithcing work ram banks
-	CPU
-		Hopefully working fine?
+		Priority
+	Audio!
 GBA
 */
 

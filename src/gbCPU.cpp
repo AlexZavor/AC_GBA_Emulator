@@ -1,15 +1,10 @@
 #include "gbCPU.h"
 
 // #define LOGFILE
-#define MOONEYE
 
 #ifdef LOGFILE
 #include <fstream>
 std::ofstream myfile;
-#endif
-
-#ifdef MOONEYE
-bool moon_signal = false;
 #endif
 
 #define ZMASK 0b10000000
@@ -4765,7 +4760,7 @@ void gbCPU::printInstruction()
 	static bool print = 0;
 
 	if(print){
-	    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
+	    printf("x%04X-x%02X | x%04X\n",registers.pc, dMEM[registers.pc], registers.af);
 	}
 	
 	// if(registers.pc == 0x294f){print = false;}
@@ -4787,14 +4782,7 @@ void gbCPU::printInstruction()
 		myfile << std::endl;
 	}
 	if(registers.pc == 0x75a3){
-		writing = 0;
-	}
-	#endif
-
-	#ifdef MOONEYE
-	if(moon_signal){
-		moon_signal = false;
-		printf("AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n", registers.af, registers.bc, registers.de, registers.hl);
+		// writing = 0;
 	}
 	#endif
 
