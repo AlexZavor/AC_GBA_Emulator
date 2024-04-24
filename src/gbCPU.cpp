@@ -1,10 +1,15 @@
 #include "gbCPU.h"
 
 // #define LOGFILE
+#define MOONEYE
 
 #ifdef LOGFILE
 #include <fstream>
 std::ofstream myfile;
+#endif
+
+#ifdef MOONEYE
+bool moon_signal = false;
 #endif
 
 #define ZMASK 0b10000000
@@ -40,7 +45,7 @@ uint8_t gbCPU::instruction(){
 	case 0x02:		//LD (BC), A
 	{
 		//Put A into memory at BC
-		dMEM[registers.bc] = registers.a;
+		MEM->write(registers.bc, registers.a);
 		registers.pc++;
 		return 8;
 	}
@@ -334,7 +339,7 @@ uint8_t gbCPU::instruction(){
 	case 0x22:		//LDI (HL), A
 	{
 		//put memory in A into memory adress HL, increment HL.
-		dMEM[registers.hl] = registers.a;
+		MEM->write(registers.hl, registers.a);
 		registers.hl++;
 		registers.pc++;
 		return 8;
@@ -510,7 +515,7 @@ uint8_t gbCPU::instruction(){
 	case 0x34:		//INC (HL)
 	{
 		//Increment data at adress HL
-		(dMEM[registers.hl])++;
+		MEM->write(registers.hl, dMEM[registers.hl] + 1);
 		setZ(!(dMEM[registers.hl]));
 		setH(dMEM[registers.hl] % 16 == 0);
 		setN(0);
@@ -521,7 +526,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//Decrement data at adress HL
 		setH(!(dMEM[registers.hl] & 0x0F));
-		(dMEM[registers.hl])--;
+		MEM->write(registers.hl, dMEM[registers.hl] - 1);
 		setZ(!(dMEM[registers.hl]));
 		setN(1);
 		registers.pc++;
@@ -625,6 +630,9 @@ uint8_t gbCPU::instruction(){
 	{
 		//Put value of register B into register B
 		//registers.b = registers.b;
+		#ifdef MOONEYE
+		moon_signal = true;
+		#endif
 		registers.pc++;
 		return 4;
 	}
@@ -1010,7 +1018,7 @@ uint8_t gbCPU::instruction(){
 	case 0x77:		//LD (HL), A
 	{
 		//Put register A into memory at adress HL
-		dMEM[registers.hl] = registers.a;
+		MEM->write(registers.hl, registers.a);
 		registers.pc++;
 		return 8;
 	}
@@ -2061,7 +2069,7 @@ uint8_t gbCPU::instruction(){
 	case 0xE0:      //LDH (n), A
 	{
 	    //put A into memory adress $FF00(IOports) + n
-		dMEM[0xFF00 + dMEM[registers.pc + 1]] = registers.a;
+		MEM->write(0xFF00 + dMEM[registers.pc + 1], registers.a);
 		registers.pc++;//increment past param
 		registers.pc++;
 		return 12;
@@ -2076,7 +2084,7 @@ uint8_t gbCPU::instruction(){
 	case 0xE2:		//LD (C), A
 	{
 		//put register A into adress $FF00 + register C
-		dMEM[0xFF00 + registers.c] = registers.a;
+		MEM->write(0xFF00 + registers.c, registers.a);
 		registers.pc++;
 		return 8;
 	}
@@ -4754,7 +4762,7 @@ void gbCPU::Failure(int code) {switch (code) {
 void gbCPU::printInstruction()
 {
 
-	static bool print = 1;
+	static bool print = 0;
 
 	if(print){
 	    printf("PC-0x%04X IR-0x%02X  |  AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n",registers.pc, dMEM[registers.pc], registers.af, registers.bc, registers.de, registers.hl);
@@ -4780,6 +4788,13 @@ void gbCPU::printInstruction()
 	}
 	if(registers.pc == 0x75a3){
 		writing = 0;
+	}
+	#endif
+
+	#ifdef MOONEYE
+	if(moon_signal){
+		moon_signal = false;
+		printf("AF-0x%04X BC-0x%04X DE-0x%04X HL-0x%04X \n", registers.af, registers.bc, registers.de, registers.hl);
 	}
 	#endif
 

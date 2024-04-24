@@ -5,9 +5,6 @@ gbcPPU::gbcPPU(gbMEM *memory, SDL_Renderer *rend, SDL_Texture *textu) {
     dMEM = memory->MEM;
     renderer = rend;
 	texture = textu;
-	memset(BGColorPallet,0xFF, sizeof(BGColorPallet));
-	memset(OBJColorPallet,0xFF, sizeof(OBJColorPallet));
-	memset(MEM->Vram, 0x00, sizeof(MEM->Vram));
 	lastDMA = dMEM[0xff55];
 }
 
@@ -82,115 +79,6 @@ uint32_t gbcPPU::updatePPU(int cycles) {
 		dMEM[0xFF41] &= 0b11111011;
 		if (dMEM[0xFF41] & 0b01000000) {
 			dMEM[0xFF0F] &= 0b11111101;
-		}
-	}
-
-	// load color pallets
-    static uint8_t lastDat = dMEM[0xFF69];
-    if(dMEM[0xFF69] != lastDat){
-        pallet* pal = BGColorPallet + ((dMEM[0xFF68] & 0x38) >> 3);
-        switch (dMEM[0xFF68] & 0x07) {
-        case 0:
-            pal->low0 = dMEM[0xFF69];
-            break;
-        case 1:
-            pal->high0 = dMEM[0xFF69];
-            break;
-        case 2:
-            pal->low1 = dMEM[0xFF69];
-            break;
-        case 3:
-            pal->high1 = dMEM[0xFF69];
-            break;
-        case 4:
-            pal->low2 = dMEM[0xFF69];
-            break;
-        case 5:
-            pal->high2 = dMEM[0xFF69];
-            break;
-        case 6:
-            pal->low3 = dMEM[0xFF69];
-            break;
-        case 7:
-            pal->high3 = dMEM[0xFF69];
-            break;
-        }
-        if(dMEM[0xFF68] & 0x80){
-            dMEM[0xFF68]++;
-            dMEM[0xFF68] &= 0b10111111;
-        }
-		
-		// trying to get it to run once every time it is writen to.
-		if(dMEM[0xFF69] == 0){
-			lastDat = dMEM[0xFF69]+1;
-			dMEM[0xFF69]++;
-		}else{
-			lastDat = dMEM[0xFF69]-1;
-			dMEM[0xFF69]--;
-		}
-    }
-
-    static uint8_t lastObj = dMEM[0xFF6B];
-    if(dMEM[0xFF6B] != lastObj){
-        pallet* pal = OBJColorPallet + ((dMEM[0xFF6A] & 0x38) >> 3);
-        switch (dMEM[0xFF6A] & 0x07)
-        {
-        case 0:
-            pal->low0 = dMEM[0xFF6B];
-            break;
-        case 1:
-            pal->high0 = dMEM[0xFF6B];
-            break;
-        case 2:
-            pal->low1 = dMEM[0xFF6B];
-            break;
-        case 3:
-            pal->high1 = dMEM[0xFF6B];
-            break;
-        case 4:
-            pal->low2 = dMEM[0xFF6B];
-            break;
-        case 5:
-            pal->high2 = dMEM[0xFF6B];
-            break;
-        case 6:
-            pal->low3 = dMEM[0xFF6B];
-            break;
-        case 7:
-            pal->high3 = dMEM[0xFF6B];
-            break;
-        }
-        if(dMEM[0xFF6A] & 0x80){
-            dMEM[0xFF6A]++;
-            dMEM[0xFF6A] &= 0b10111111;
-        }
-		
-		
-		// trying to get it to run once every time it is writen to.
-		if(dMEM[0xFF6B] == 0){
-			lastObj = dMEM[0xFF6B]+1;
-			dMEM[0xFF6B]++;
-		}else{
-			lastObj = dMEM[0xFF6B]-1;
-			dMEM[0xFF6B]--;
-		}
-    }
-
-	// Check for DMA Transfer
-	if(dMEM[0xFF55] != lastDMA){
-		lastDMA = dMEM[0xFF55];
-		if(lastDMA & 0x80){
-			// H-blank DMA
-			printf("H-blank dma\n");
-			lastDMA = 0xFF;
-			dMEM[0xFF55] = 0xFF;
-		} else {
-			// Instant DMA
-			uint16_t size = ((lastDMA & 0x7f) + 1);
-			MEM->vRamDMAFull(size * 0x10);
-			time += size;
-			lastDMA = 0xFF;
-			dMEM[0xFF55] = 0xFF;
 		}
 	}
 
@@ -298,16 +186,16 @@ void gbcPPU::drawBackground() {
 		switch (pixel)
 		{
 		case 0:
-			pixel = BGColorPallet[pal].color0;
+			pixel = MEM->BGColorPallet[pal].color0;
 			break;
 		case 1:
-			pixel = BGColorPallet[pal].color1;
+			pixel = MEM->BGColorPallet[pal].color1;
 			break;
 		case 2:
-			pixel = BGColorPallet[pal].color2;
+			pixel = MEM->BGColorPallet[pal].color2;
 			break;
 		case 3:
-			pixel = BGColorPallet[pal].color3;
+			pixel = MEM->BGColorPallet[pal].color3;
 			break;
 		default:
 			break;
@@ -388,16 +276,16 @@ void gbcPPU::drawWindow() {
 			switch (pixel)
 			{
 			case 0:
-				pixel = BGColorPallet[pal].color0;
+				pixel = MEM->BGColorPallet[pal].color0;
 				break;
 			case 1:
-				pixel = BGColorPallet[pal].color1;
+				pixel = MEM->BGColorPallet[pal].color1;
 				break;
 			case 2:
-				pixel = BGColorPallet[pal].color2;
+				pixel = MEM->BGColorPallet[pal].color2;
 				break;
 			case 3:
-				pixel = BGColorPallet[pal].color3;
+				pixel = MEM->BGColorPallet[pal].color3;
 				break;
 			default:
 				break;
@@ -461,18 +349,18 @@ void gbcPPU::drawSprites() {
 				uint8_t Y = ypos + r;
 				uint8_t X = xpos + bit;
 				if (Y >= 0 && Y < 144 && X >= 0 && X < 160) {
-					bool objPriority = (dMEM[0xFF40]&0x01) && ((flags & 0x80) || (BGPriority[X]));
+					bool objPriority = ((dMEM[0xFF40]&0x01) && ((flags & 0x80) || (BGPriority[X])));
 					if ((!objPriority) || (line[X] == 0)) {
 						switch (pixel)
 						{
 						case 1:
-							pixel = OBJColorPallet[pal].color1;
+							pixel = MEM->OBJColorPallet[pal].color1;
 							break;
 						case 2:
-							pixel = OBJColorPallet[pal].color2;
+							pixel = MEM->OBJColorPallet[pal].color2;
 							break;
 						case 3:
-							pixel = OBJColorPallet[pal].color3;
+							pixel = MEM->OBJColorPallet[pal].color3;
 							break;
 						}
 						Vram[X][Y] = pixel;

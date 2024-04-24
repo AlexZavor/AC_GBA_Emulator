@@ -23,7 +23,8 @@ void gbcEmulator::runFrame(inputData input) {
     
     for (uint8_t line = 0; line < 154; line++)
     {
-        static int cyclecount = 0; 
+        static int cyclecount = 0;
+        static bool speed = 0 ;
         cyclecount += 456;
         MEM->MEM[0xFF44] = line;
         while (cyclecount > 0)
@@ -42,22 +43,17 @@ void gbcEmulator::runFrame(inputData input) {
             }
             // Run CPU until finish line
             // CPU->printInstruction();
-            uint8_t cycles = (CPU->instruction())/2;
+            uint8_t cycles = (CPU->instruction())/(1+(speed?1:0));
             cyclecount -= PPU->updatePPU(cyclecount);
-            cycles += (CPU->interrupts(cycles))/2;
+            cycles += (CPU->interrupts(cycles))/(1+(speed?1:0));
             CPU->timers(cycles);
 
             cyclecount -= cycles;
 
-            // Wram check
-            if(prevWbank != MEM->MEM[0xFF70]){
-                prevWbank = MEM->MEM[0xFF70];
-                MEM->swapWramBank(prevWbank);
-            }
-            // Vram check
-            if(prevVbank != MEM->MEM[0xFF4F]){
-                prevVbank = MEM->MEM[0xFF4F];
-                MEM->swapVramBank(prevVbank);
+            // Speed check
+            if(((MEM->MEM[0xFF4D]&0x80)>>7) != (MEM->MEM[0xFF4D]&0x01)){
+                MEM->MEM[0xFF4D] ^= 0x80;
+                speed = MEM->MEM[0xFF4D]&0x80;
             }
         }
         //Draw line

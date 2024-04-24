@@ -7,6 +7,38 @@
 #include <cstring>
 #include <string>
 
+
+typedef struct {
+    union{
+        struct{
+            uint8_t low0;
+            uint8_t high0;
+        };
+        uint16_t color0;
+    };
+    union{
+        struct{
+            uint8_t low1;
+            uint8_t high1;
+        };
+        uint16_t color1;
+    };
+    union{
+        struct{
+            uint8_t low2;
+            uint8_t high2;
+        };
+        uint16_t color2;
+    };
+    union{
+        struct{
+            uint8_t low3;
+            uint8_t high3;
+        };
+        uint16_t color3;
+    };
+}pallet;
+
 class gbMEM{
     public:
         uint8_t MEM[0x10000];
@@ -14,6 +46,9 @@ class gbMEM{
 
         uint8_t Vram[0x4000];
         uint8_t VramBank = 1;
+
+        pallet BGColorPallet[8];
+        pallet OBJColorPallet[8];
 
     private:
         char* cartrage;

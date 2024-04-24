@@ -29,6 +29,9 @@ Echo of 8kB Internal RAM
 
 gbMEM::gbMEM() {
     initMem();
+	memset(BGColorPallet,0xFF, sizeof(BGColorPallet));
+	memset(OBJColorPallet,0xFF, sizeof(OBJColorPallet));
+	memset(Vram, 0x00, sizeof(Vram));
 	color = false;
 }
 
@@ -133,6 +136,103 @@ void gbMEM::write(uint16_t address, uint8_t data){
 			break;
 		}
 		return;
+	}
+	else if(address == 0xFF55){
+		// GBC dma transfer
+		if(data & 0x80){
+			// H-blank DMA
+			printf("H-blank dma\n");
+			MEM[0xFF55] = 0xFF;
+		} else {
+			// Instant DMA
+			// printf("more DMA\n");
+			uint16_t size = ((data & 0x7f) + 1);
+			vRamDMAFull(size * 0x10);
+			// time += size;
+			MEM[0xFF55] = 0xFF;
+		}
+		// MEM[address] = data;
+	}
+	else if(address == 0xFF69){
+		// BG color pallets
+		MEM[address] = data;
+        pallet* pal = BGColorPallet + ((MEM[0xFF68] & 0x38) >> 3);
+        switch (MEM[0xFF68] & 0x07) {
+        case 0:
+            pal->low0 = MEM[0xFF69];
+            break;
+        case 1:
+            pal->high0 = MEM[0xFF69];
+            break;
+        case 2:
+            pal->low1 = MEM[0xFF69];
+            break;
+        case 3:
+            pal->high1 = MEM[0xFF69];
+            break;
+        case 4:
+            pal->low2 = MEM[0xFF69];
+            break;
+        case 5:
+            pal->high2 = MEM[0xFF69];
+            break;
+        case 6:
+            pal->low3 = MEM[0xFF69];
+            break;
+        case 7:
+            pal->high3 = MEM[0xFF69];
+            break;
+        }
+        if(MEM[0xFF68] & 0x80){
+            MEM[0xFF68]++;
+            MEM[0xFF68] &= 0b10111111;
+        }
+	}
+	else if(address == 0xFF6B){
+		// OBJ color pallets
+		MEM[address] = data;
+        pallet* pal = OBJColorPallet + ((MEM[0xFF6A] & 0x38) >> 3);
+        switch (MEM[0xFF6A] & 0x07)
+        {
+        case 0:
+            pal->low0 = MEM[0xFF6B];
+            break;
+        case 1:
+            pal->high0 = MEM[0xFF6B];
+            break;
+        case 2:
+            pal->low1 = MEM[0xFF6B];
+            break;
+        case 3:
+            pal->high1 = MEM[0xFF6B];
+            break;
+        case 4:
+            pal->low2 = MEM[0xFF6B];
+            break;
+        case 5:
+            pal->high2 = MEM[0xFF6B];
+            break;
+        case 6:
+            pal->low3 = MEM[0xFF6B];
+            break;
+        case 7:
+            pal->high3 = MEM[0xFF6B];
+            break;
+        }
+        if(MEM[0xFF6A] & 0x80){
+            MEM[0xFF6A]++;
+            MEM[0xFF6A] &= 0b10111111;
+        }
+	}
+	else if(address == 0xFF4F){
+		// Vram check
+		MEM[address] = (data | 0xE);
+		swapVramBank(data);
+	}
+	else if(address == 0xFF70){
+		// Wram check
+		MEM[address] = data;
+		swapWramBank(data);
 	}
 	else{
 		MEM[address] = data;
@@ -426,6 +526,7 @@ bool gbMEM::saveVram()
 }
 
 bool gbMEM::vRamDMAFull(uint16_t size) {
+	saveVram();
 	uint16_t dest = ((uint16_t)MEM[0xFF51] << 8) + (uint16_t)MEM[0xFF52];
 	dest &= 0x1FF0;
 	dest |= 0x8000;
