@@ -14,6 +14,7 @@ GameBoyAdvanceEmulator.sln
 *.exe
 .cmake/
 compile_commands.json
+desktop.ini
 
 
 # Rom Files

@@ -2,17 +2,13 @@
 #define GAMES_H
 
 #include "tinydir.h"
+#include "globals.h"
 #include <vector>
 #include <string>
 
-typedef enum{
-    GB,
-    GBC,
-    GBA
-} systems;
 
 typedef struct {
-    systems system;
+    GB_sys system;
     std::string name;
 } game;
 

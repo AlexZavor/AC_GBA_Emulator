@@ -10,6 +10,7 @@
 #include "inputData.h"
 #include "gbEmulator.h"
 #include "gbcEmulator.h"
+#include "audioHandler.h"
 
 /*
 GB
@@ -108,6 +109,8 @@ int main(int argc, char* argv[]) {
 		gbcEmulator* GBCEmulator = nullptr;
 		gbEmulator* GBAEmulator = nullptr;
 
+		SDL_AudioDeviceID audioID = 0;
+
 		// Main loop logic
 		bool quit = false;
 
@@ -120,7 +123,6 @@ int main(int argc, char* argv[]) {
 				}
 				//User presses a key
 				else if( e.type == SDL_KEYDOWN ) {
-					//Select surfaces based on key press
 					switch( e.key.keysym.sym ) {
 						case KEY_UP:
 						input.up = 1;
@@ -156,6 +158,7 @@ int main(int argc, char* argv[]) {
 						break;
 						case KEY_MENU:
 						menu = true;
+						stopAudio(audioID);
 						#ifdef FPS_COUNT
 							printf("max - %f, min - %f\n", maxTime, minTime);
 						#endif
@@ -171,6 +174,9 @@ int main(int argc, char* argv[]) {
 							delete GBAEmulator;
 							GBAEmulator = nullptr;
 						}
+						break;
+						case KEY_MUTE:
+							toggleAudio(audioID);
 						break;
 					}
 				}
@@ -262,6 +268,8 @@ int main(int argc, char* argv[]) {
 					case GB:
 						//Create Emulator
 						GBEmulator = new gbEmulator(renderer, texture);
+						deleteAudio(audioID);
+						audioID = initAudio(GB);
 						//Insert cartrage, if succsess, leave menu
 						if(GBEmulator->insertCart(GAME_DIR + Game.name)){
 							menu = false;
@@ -270,6 +278,8 @@ int main(int argc, char* argv[]) {
 					case GBC:
 						//Create Emulator
 						GBCEmulator = new gbcEmulator(renderer, texture);
+						deleteAudio(audioID);
+						audioID = initAudio(GBC);
 						//Insert cartrage, if succsess, leave menu
 						if(GBCEmulator->insertCart(GAME_DIR + Game.name)){
 							menu = false;
@@ -278,6 +288,8 @@ int main(int argc, char* argv[]) {
 					case GBA:
 						//Create Emulator
 						GBAEmulator = new gbEmulator(renderer, texture);
+						deleteAudio(audioID);
+						audioID = initAudio(GBA);
 						//Insert cartrage, if succsess, leave menu
 						if(GBAEmulator->insertCart(GAME_DIR + Game.name)){
 							menu = false;

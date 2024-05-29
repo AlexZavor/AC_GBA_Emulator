@@ -16,6 +16,7 @@
 #define KEY_RB		SDLK_w
 #define KEY_LB		SDLK_q
 #define KEY_MENU	SDLK_ESCAPE
+#define KEY_MUTE    SDLK_m
 
 typedef struct
 {

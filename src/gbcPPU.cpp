@@ -230,7 +230,7 @@ void gbcPPU::drawWindow() {
 	}
 	//draw Window on Vram
 	for (int x = 0; x < 160; x++) {
-		static int y = dMEM[0xFF44];
+		int y = dMEM[0xFF44];
 		int X = x - (dMEM[0xFF4B]-7);
 		int Y = y - dMEM[0xFF4A];
 		if (Y >= 256) {
