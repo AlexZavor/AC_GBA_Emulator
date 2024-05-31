@@ -4,10 +4,12 @@ gbEmulator::gbEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     MEM = new gbMEM();
     CPU = new gbCPU(MEM);
     PPU = new gbPPU(MEM, renderer, texture);
+    gbAPU().APU_setMEM(MEM);
 }
 
 gbEmulator::~gbEmulator()
 {
+    gbAPU().APU_clearMEM();
     delete MEM;
     // delete CPU;
     // delete PPU;

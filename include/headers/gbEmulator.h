@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "SDL.h"
 #include "inputData.h"
+#include "gbAPU.h"
 #include "gbMEM.h"
 #include "gbCPU.h"
 #include "gbPPU.h"

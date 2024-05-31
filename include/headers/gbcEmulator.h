@@ -7,6 +7,7 @@
 #include "inputData.h"
 #include "gbMEM.h"
 #include "gbCPU.h"
+#include "gbAPU.h"
 #include "gbcPPU.h"
 
 class gbcEmulator{

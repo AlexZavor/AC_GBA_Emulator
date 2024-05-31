@@ -10,7 +10,15 @@
 #include <math.h>
 
 GB_sys audioSystem;
+gbAPU* gbapu = new gbAPU();
 bool isPaused = 0;
+
+void emptyAudio(Sint16* samples, int sample_count){
+	for (int i = 0; i < sample_count; ++i)
+	{
+		samples[i] = 0;
+	}
+}
 
 void runAudio(void* userdata, Uint8* stream, int length)
 {
@@ -19,9 +27,10 @@ void runAudio(void* userdata, Uint8* stream, int length)
     switch (audioSystem) {
     case GB:
     case GBC:
-        gbAudioCallback(samples, sample_count);
+        gbapu->gbAudioCallback(samples, sample_count);
         break;
     case GBA:
+        emptyAudio(samples, sample_count);
         // TODO: add GBA audio here!
         break;
     default:
@@ -70,6 +79,5 @@ void toggleAudio(SDL_AudioDeviceID device_id){
         stopAudio(device_id);
     }
 }
-
 
 #endif // AUDIOHANDLER_H

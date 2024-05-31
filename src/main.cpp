@@ -353,3 +353,6 @@ int main(int argc, char* argv[]) {
 
 	return 0;
 }
+
+// Don't even worry about it
+gbMEM* gbAPU::APU_MEM = nullptr;
