@@ -1,4 +1,4 @@
-#include "headers/inputData.h"
+#include "inputData.h"
 
 void printInputData(inputData data){
     printf("%d %d %d %d | %d %d | %d %d \n", 

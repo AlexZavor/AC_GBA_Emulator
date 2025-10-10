@@ -25,7 +25,7 @@ class gbcEmulator{
         ~gbcEmulator();
         //Calls the GB Emulator to run for one frame and return the output
         void runFrame(inputData input);
-        //Inserts a cartrage into the Game Boy
+        //Inserts a cartage into the Game Boy
         bool insertCart(std::string game);
 
 };

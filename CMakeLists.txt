@@ -4,11 +4,11 @@ project(GameBoyAdvanceEmulator  VERSION 1.0.0
         DESCRIPTION "C++ implemented emulator for the Game Boy Advance"
         LANGUAGES CXX)
         
+# Debug system that can be set TRUE or FALSE
 set(DEBUG TRUE)
 
-link_directories(lib)
+#SDL Include Directories
 set(SDL2_DIR "lib/cmake/SDL2")
-include_directories(include)
 include_directories(include/headers)
 include_directories(include/SDL2)
 
@@ -22,7 +22,10 @@ target_sources(GBA PRIVATE "res/icon.rc")
 
 find_package(SDL2 REQUIRED)
 
-target_link_libraries(GBA mingw32)
+if(WIN32)
+    link_directories(lib)
+    target_link_libraries(GBA mingw32)
+endif()
 target_link_libraries(GBA SDL2main)
 target_link_libraries(GBA SDL2_ttf)
 target_link_libraries(GBA SDL2)
@@ -30,5 +33,9 @@ target_link_libraries(GBA SDL2)
 if(DEBUG)
     set(CMAKE_CXX_FLAGS "-Wall -DDEBUG")
 else()
-    set(CMAKE_CXX_FLAGS "-Wl,-subsystem,windows -O3")  
+    if(WIN32)
+    set(CMAKE_CXX_FLAGS "-Wl,--subsystem,windows -O3")  
+    else()
+    set(CMAKE_CXX_FLAGS "-Wl, -O3")  
+    endif()
 endif()

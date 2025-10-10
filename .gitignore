@@ -16,10 +16,13 @@ GameBoyAdvanceEmulator.sln
 compile_commands.json
 desktop.ini
 
-
 # Rom Files
 ROMS/
 SAVES/
 
 #Testing
 *.log
+
+# Build Files
+GBA
+*.exe

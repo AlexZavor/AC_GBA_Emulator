@@ -1,7 +1,3 @@
-#ifdef DEBUG
-	// #define FPS_COUNT
-#endif
-
 #include <stdio.h>
 #include "games.h"
 #include "globals.h"
@@ -26,7 +22,11 @@ GBC
 GBA
 */
 
+// TODO: Reorganize File Structure
 
+#ifdef DEBUG
+	#define FPS_COUNT
+#endif
 #ifdef FPS_COUNT
 	float minTime = 200;
 	float maxTime = 0;
@@ -44,7 +44,7 @@ bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer, SDL_Texture** t
 		printf( "Window could not be created! SDL_Error: %s\n", SDL_GetError() );
 		return 0;
 	}
-	//Create vsynced renderer for window
+	//Create v-synced renderer for window
 	*renderer = SDL_CreateRenderer( *window, -1, SDL_RENDERER_ACCELERATED /*| SDL_RENDERER_PRESENTVSYNC*/ );
 	if( *renderer == NULL ) {
 		printf( "Renderer could not be created! SDL Error: %s\n", SDL_GetError() );
@@ -99,11 +99,12 @@ int main(int argc, char* argv[]) {
 
 	if(initializeSDL(&window, &renderer, &texture)){
 		// Menu system
-		game Game;
 		unsigned int page = 0;
 		unsigned int selection = 0;
 		bool menu = true;
+		game Game;
 		
+		// TODO: Change Emulators from objects to having their own "applications"
 		// Emulator
 		gbEmulator* GBEmulator = nullptr;
 		gbcEmulator* GBCEmulator = nullptr;
@@ -115,10 +116,10 @@ int main(int argc, char* argv[]) {
 		bool quit = false;
 
 		while(!quit){
-			//Handle events on queue
+			//Handle events on queue for menu
 			while( SDL_PollEvent( &e ) != 0 ) {
-				//User requests quit
-				if( e.type == SDL_QUIT ) {
+				//User requests quit (alt+f4 or X button)
+				if( e.type == SDL_QUIT) {
 					quit = true;
 				}
 				//User presses a key
@@ -212,9 +213,9 @@ int main(int argc, char* argv[]) {
 			}
 			
 			if(menu){
-				SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+				SDL_SetRenderDrawColor(renderer, 12, 12, 32, 255);
 				SDL_RenderClear(renderer);
-				static TTF_Font* Sans = TTF_OpenFont("../fonts/Minecraft.ttf", 16);
+				static TTF_Font* font = TTF_OpenFont("../fonts/Minecraft.ttf", 16);
 				unsigned int y = 5;
 				for (unsigned int i = 0; i < 13;i++) {
 					if (i + (page * 13) < Roms.size()) {
@@ -237,14 +238,14 @@ int main(int argc, char* argv[]) {
 						// as TTF_RenderText_Solid could only be used on
 						// SDL_Surface then you have to create the surface first
 						SDL_Surface* surfaceMessage =
-							TTF_RenderText_Solid(Sans, Roms[i + (page * 13)].name.c_str(), color); 
+							TTF_RenderText_Solid(font, Roms[i + (page * 13)].name.c_str(), color); 
 
 						// now you can convert it into a texture
 						SDL_Texture* Message = SDL_CreateTextureFromSurface(renderer, surfaceMessage);
 
 						SDL_Rect Message_rect; //create a rect
 						Message_rect.x = 10;  //controls the rect's x coordinate 
-						Message_rect.y = y+2; // controls the rect's y coordinte
+						Message_rect.y = y+2; // controls the rect's y coordinate
 						Message_rect.w = Roms[i + (page * 13)].name.length()*5; // controls the width of the rect
 						Message_rect.h = 8; // controls the height of the rect
 						SDL_RenderCopy(renderer, Message, NULL, &Message_rect);
@@ -270,7 +271,7 @@ int main(int argc, char* argv[]) {
 						GBEmulator = new gbEmulator(renderer, texture);
 						deleteAudio(audioID);
 						audioID = initAudio(GB);
-						//Insert cartrage, if succsess, leave menu
+						// Insert cartage, if successful, leave menu
 						if(GBEmulator->insertCart(GAME_DIR + Game.name)){
 							menu = false;
 						}
@@ -280,7 +281,7 @@ int main(int argc, char* argv[]) {
 						GBCEmulator = new gbcEmulator(renderer, texture);
 						deleteAudio(audioID);
 						audioID = initAudio(GBC);
-						//Insert cartrage, if succsess, leave menu
+						//Insert cartage, if successful, leave menu
 						if(GBCEmulator->insertCart(GAME_DIR + Game.name)){
 							menu = false;
 						}
@@ -290,7 +291,7 @@ int main(int argc, char* argv[]) {
 						GBAEmulator = new gbEmulator(renderer, texture);
 						deleteAudio(audioID);
 						audioID = initAudio(GBA);
-						//Insert cartrage, if succsess, leave menu
+						//Insert cartage, if successful, leave menu
 						if(GBAEmulator->insertCart(GAME_DIR + Game.name)){
 							menu = false;
 						}
@@ -314,13 +315,16 @@ int main(int argc, char* argv[]) {
 					GBAEmulator->runFrame(input);
 					break;	
 				default:
-					printf("Yikes, system not supported");
+					printf("Yikes, system not supported!");
+					// TODO: Break out Menu into file with defines and functions
+					// menu_draw_alert("Error opening the file: System Not supported");
 					break;
 				}
 				
 				//Update screen
 				SDL_RenderPresent( renderer );
 
+				// TODO: Maybe add a Timer Class? handle time and FPS Counter
 				Uint64 end = SDL_GetPerformanceCounter();
 				float elapsedMS = (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
 				// Cap to 60 FPS
@@ -354,5 +358,6 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
+// TODO: ...what?
 // Don't even worry about it
 gbMEM* gbAPU::APU_MEM = nullptr;

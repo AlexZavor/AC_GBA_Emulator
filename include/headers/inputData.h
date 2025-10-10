@@ -34,8 +34,10 @@ typedef struct
     bool LB;
 } inputData;
 
+// Prints out current input data in struct
 void printInputData(inputData data);
 
+// sets all input data to 0
 void resetInputData(inputData *data);
 
 #endif // INPUTDATA_H

@@ -14,8 +14,8 @@ typedef enum{
 #define SCREEN_HEIGHT (144 * SCALE)
 
 // Directorys
-#define GAME_DIR "ROMS/"
-#define SAVE_DIR "SAVES/"
+#define GAME_DIR "./ROMS/"
+#define SAVE_DIR "./SAVES/"
 
 // Audio
 #define VOLUME 7000
