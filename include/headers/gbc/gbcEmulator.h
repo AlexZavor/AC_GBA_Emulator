@@ -5,19 +5,16 @@
 #include <stdio.h>
 #include "SDL.h"
 #include "inputData.h"
-#include "gbMEM.h"
-#include "gbCPU.h"
-#include "gbAPU.h"
-#include "gbcPPU.h"
+#include "gb/gbMEM.h"
+#include "gb/gbCPU.h"
+#include "gb/gbAPU.h"
+#include "gbc/gbcPPU.h"
 
 class gbcEmulator{
     private:
         gbMEM* MEM;
         gbCPU* CPU;
         gbcPPU* PPU;
-
-        uint8_t prevWbank;
-        uint8_t prevVbank;
     public:
         //Constructor. should initialize things like memory and prepare for first instruction
         gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture);

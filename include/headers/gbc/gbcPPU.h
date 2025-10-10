@@ -3,7 +3,7 @@
 
 #include "stdint.h"
 #include "SDL.h"
-#include "gbMEM.h"
+#include "gb/gbMEM.h"
 #include <vector>
 #include "globals.h"
 
@@ -24,7 +24,7 @@ class gbcPPU{
         uint8_t lastDMA;
 
     public:
-        gbcPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu);
+        gbcPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* tex);
         void drawLine();
         uint32_t updatePPU(int cycles);
 

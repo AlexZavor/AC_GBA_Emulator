@@ -5,10 +5,10 @@
 #include <stdio.h>
 #include "SDL.h"
 #include "inputData.h"
-#include "gbAPU.h"
-#include "gbMEM.h"
-#include "gbCPU.h"
-#include "gbPPU.h"
+#include "gb/gbAPU.h"
+#include "gb/gbMEM.h"
+#include "gb/gbCPU.h"
+#include "gb/gbPPU.h"
 
 class gbEmulator{
     private:
@@ -22,7 +22,7 @@ class gbEmulator{
         ~gbEmulator();
         //Calls the GB Emulator to run for one frame and return the output
         void runFrame(inputData input);
-        //Inserts a cartrage into the Game Boy
+        //Inserts a cartage into the Game Boy
         bool insertCart(std::string game);
 
 };

@@ -1,5 +1,5 @@
 
-#include "gbMEM.h"
+#include "gb/gbMEM.h"
 /*
 Interrupt Enable Register
 --------------------------- FFFF

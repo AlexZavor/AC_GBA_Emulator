@@ -3,7 +3,7 @@
 
 #include "stdint.h"
 #include "SDL.h"
-#include "gbMEM.h"
+#include "gb/gbMEM.h"
 #include <vector>
 #include "globals.h"
 
@@ -17,7 +17,7 @@ class gbPPU{
         uint8_t Vram[160][144];
 
     public:
-        gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* textu);
+        gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* tex);
         void drawLine();
         void updatePPU(int cycles);
 

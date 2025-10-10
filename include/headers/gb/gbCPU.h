@@ -2,7 +2,7 @@
 #define GBCPU_H
 #include <stdint.h>
 #include <cstring>
-#include "gbMEM.h"
+#include "gb/gbMEM.h"
 
 struct reg {
     struct {

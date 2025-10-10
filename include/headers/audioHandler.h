@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include "SDL.h"
 #include "globals.h"
-#include "gbAPU.h"
+#include "gb/gbAPU.h"
 #include <time.h>
 #include <math.h>
 

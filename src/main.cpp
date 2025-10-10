@@ -4,8 +4,8 @@
 #include "SDL.h"
 #include "SDL_ttf.h"
 #include "inputData.h"
-#include "gbEmulator.h"
-#include "gbcEmulator.h"
+#include "gb/gbEmulator.h"
+#include "gbc/gbcEmulator.h"
 #include "audioHandler.h"
 
 /*
@@ -22,7 +22,8 @@ GBC
 GBA
 */
 
-// TODO: Reorganize File Structure
+// TODO: Reorganize system from C++ to C based (init and update func.)
+// TODO: Fix Saves (probably force file dir to exist)
 
 #ifdef DEBUG
 	#define FPS_COUNT

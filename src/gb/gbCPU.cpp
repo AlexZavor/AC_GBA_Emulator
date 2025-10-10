@@ -1,4 +1,4 @@
-#include "gbCPU.h"
+#include "gb/gbCPU.h"
 
 // #define LOGFILE
 

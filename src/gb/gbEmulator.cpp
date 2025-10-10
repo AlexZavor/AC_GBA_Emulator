@@ -1,4 +1,4 @@
-#include "gbEmulator.h"
+#include "gb/gbEmulator.h"
 
 gbEmulator::gbEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     MEM = new gbMEM();
@@ -23,10 +23,10 @@ void gbEmulator::runFrame(inputData input) {
     
     for (uint8_t line = 0; line < 154; line++)
     {
-        static int cyclecount = 0; 
-        cyclecount += 456;
+        static int cycle_count = 0; 
+        cycle_count += 456;
         MEM->MEM[0xFF44] = line;
-        while (cyclecount > 0)
+        while (cycle_count > 0)
         {   
             //Update joypad
             switch (MEM->MEM[0xFF00] & 0x30) {
@@ -46,8 +46,8 @@ void gbEmulator::runFrame(inputData input) {
             cycles += CPU->interrupts(cycles);
             CPU->timers(cycles);
 
-            cyclecount -= cycles;
-            PPU->updatePPU(cyclecount);
+            cycle_count -= cycles;
+            PPU->updatePPU(cycle_count);
         }
         //Draw line
         PPU->drawLine();

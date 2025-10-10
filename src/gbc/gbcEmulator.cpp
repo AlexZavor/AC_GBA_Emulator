@@ -1,4 +1,4 @@
-#include "gbcEmulator.h"
+#include "gbc/gbcEmulator.h"
 
 gbcEmulator::gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     MEM = new gbMEM();
@@ -6,7 +6,6 @@ gbcEmulator::gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     CPU->setColor();
     PPU = new gbcPPU(MEM, renderer, texture);
     gbAPU().APU_setMEM(MEM);
-    prevWbank = 1;
 }
 
 gbcEmulator::~gbcEmulator()
@@ -25,11 +24,11 @@ void gbcEmulator::runFrame(inputData input) {
     
     for (uint8_t line = 0; line < 154; line++)
     {
-        static int cyclecount = 0;
+        static int cycle_count = 0;
         static bool speed = 0 ;
-        cyclecount += 456;
+        cycle_count += 456;
         MEM->MEM[0xFF44] = line;
-        while (cyclecount > 0)
+        while (cycle_count > 0)
         {   
             //Update joypad
             switch (MEM->MEM[0xFF00] & 0x30) {
@@ -46,11 +45,11 @@ void gbcEmulator::runFrame(inputData input) {
             // Run CPU until finish line
             // CPU->printInstruction();
             uint8_t cycles = (CPU->instruction())/(1+(speed?1:0));
-            cyclecount -= PPU->updatePPU(cyclecount);
+            cycle_count -= PPU->updatePPU(cycle_count);
             cycles += (CPU->interrupts(cycles))/(1+(speed?1:0));
             CPU->timers(cycles);
 
-            cyclecount -= cycles;
+            cycle_count -= cycles;
 
             // Speed check
             if(((MEM->MEM[0xFF4D]&0x80)>>7) != (MEM->MEM[0xFF4D]&0x01)){

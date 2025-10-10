@@ -14,7 +14,7 @@ include_directories(include/SDL2)
 
 ############### Main Build ###############
 
-file(GLOB GBA_SRC CONFIGURE_DEPENDS "src/*.cpp")
+file(GLOB_RECURSE GBA_SRC CONFIGURE_DEPENDS "src/***.cpp")
 
 add_executable(GBA ${GBA_SRC})
 

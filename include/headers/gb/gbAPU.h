@@ -2,7 +2,7 @@
 #define GBAPU_H
 
 #include "globals.h"
-#include "gbMEM.h"
+#include "gb/gbMEM.h"
 #include <math.h>
 
 #define PLAYING_FREQ 440
