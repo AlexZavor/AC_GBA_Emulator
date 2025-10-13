@@ -1,11 +1,14 @@
 #ifndef GBMEM_H
 #define GBMEM_H
-#include <stdint.h>
+#include <cstdint>
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
 #include <cstring>
 #include <string>
+#include "string.h"
+#include "stdlib.h"
+#include "stdio.h"
 
 
 typedef struct {
@@ -51,7 +54,7 @@ class gbMEM{
         pallet OBJColorPallet[8];
 
     private:
-        char* cartrage;
+        char* cartage;
         char* ram;
         
         uint8_t Wram[0x8000];
@@ -86,13 +89,13 @@ class gbMEM{
     public:
         gbMEM();
         ~gbMEM();
-        // read with cartrage operations
+        // read with cartage operations
         // uint8_t read(uint16_t address);
-        // write with cartrage operations
+        // write with cartage operations
         void write(uint16_t address, uint8_t data);
-        // wrtie data | mem with cartrage operations
+        // write data | mem with cartage operations
         void orWrite(uint16_t address, uint8_t data);
-        // write data & mem with cartrage operations
+        // write data & mem with cartage operations
         void andWrite(uint16_t address, uint8_t data);
 
         // insert and save a cart to memory
@@ -112,9 +115,9 @@ class gbMEM{
 
 
     private:
-        // initalize starting memory (mostly from nintendo logo)
+        // initialize starting memory (mostly from nintendo logo)
         void initMem();
-        // Load what MBC the cartrage is
+        // Load what MBC the cartage is
         bool setMBC(uint8_t code);
         // Set number of banks from code
         bool setBanks(uint8_t code);

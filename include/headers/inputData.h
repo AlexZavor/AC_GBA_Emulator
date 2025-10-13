@@ -17,6 +17,7 @@
 #define KEY_LB		SDLK_q
 #define KEY_MENU	SDLK_ESCAPE
 #define KEY_MUTE    SDLK_m
+#define QUIT        SDL_QUIT    
 
 typedef struct
 {
@@ -32,6 +33,8 @@ typedef struct
 
     bool RB;
     bool LB;
+
+    bool quit;
 } inputData;
 
 // Prints out current input data in struct

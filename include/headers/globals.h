@@ -12,6 +12,7 @@ typedef enum{
 //Screen dimension constants
 #define SCREEN_WIDTH (160 * SCALE)
 #define SCREEN_HEIGHT (144 * SCALE)
+#define GREEN_PALLET
 
 // Directorys
 #define GAME_DIR "./ROMS/"

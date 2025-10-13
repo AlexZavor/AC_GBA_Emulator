@@ -1,5 +1,8 @@
-
 #include "gb/gbMEM.h"
+
+#include "globals.h"
+#include <sys/stat.h> //For creating folder
+
 /*
 Interrupt Enable Register
 --------------------------- FFFF
@@ -22,7 +25,7 @@ Echo of 8kB Internal RAM
 8kB Video RAM
 --------------------------- 8000 --
 16kB switchable ROM bank |
---------------------------- 4000   |= 32kB Cartrigbe
+--------------------------- 4000   |= 32kB Cartridge
 16kB ROM bank #0 |
 --------------------------- 0000 --
 */
@@ -42,11 +45,11 @@ gbMEM::~gbMEM()
 
 void gbMEM::write(uint16_t address, uint8_t data){
 	if (address < 0x8000) {
-		//Writing to cartrage. probably a register
-		// std::cout << "cartrage write" << std::endl;
+		// Writing to cartage. probably a register
+		// std::cout << "cartage write" << std::endl;
 		switch (cartMBC) {
 		case MBC::NONE:
-			//std::cout << "probably tetris being annoying" << std::endl;
+			//std::cout << "probably Tetris being annoying" << std::endl;
 			break;
 		case MBC::MBC1:
 			if (address < 0x2000) {
@@ -71,7 +74,7 @@ void gbMEM::write(uint16_t address, uint8_t data){
 					bank &= 0b00000011;
 				}
 				// printf("Bank swap - %d\n", bank);
-				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
+				memcpy(MEM + 0x4000, cartage + ((long)bank * (long)0x4000), 0x4000);
 			}
 			else if (address < 0x6000) {
 				//RAM Bank Number / upper bits
@@ -111,13 +114,13 @@ void gbMEM::write(uint16_t address, uint8_t data){
 				bank += data;
 				bank %= banks;
 				// printf("Swap rom bank - MBC5 %d\n", bank);
-				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
+				std::memcpy(MEM + 0x4000, cartage + ((long)bank * (long)0x4000), 0x4000);
 			}
 			else if (address < 0x4000) {
 				//ROM Bank Number high bit
 				bank &= 0x00FF;
 				bank |= ((uint16_t)(data))<<8;
-				std::memcpy(MEM + 0x4000, cartrage + ((long)bank * (long)0x4000), 0x4000);
+				std::memcpy(MEM + 0x4000, cartage + ((long)bank * (long)0x4000), 0x4000);
 			}
 			else if (address < 0x6000) {
 				//RAM Bank Number
@@ -266,12 +269,12 @@ bool gbMEM::insertCart(std::string game){
 	if (file2.is_open())
 	{
 		size = file2.tellg();
-		cartrage = new char[(int)size];
+		cartage = new char[(int)size];
 		this->game = game.erase(game.size() - 3, game.size() - 1).erase(0,5);
 		file2.seekg(0, std::ios::beg);
-		file2.read(cartrage, size);
+		file2.read(cartage, size);
 		file2.close();
-		memcpy(MEM, cartrage, 0x8000);
+		memcpy(MEM, cartage, 0x8000);
 		if (!setMBC(MEM[0x0147])) {
 			std::cout << "\n Unrecognized MBC - ";
 			printf("%.2X\n", MEM[0x0147]);
@@ -283,12 +286,12 @@ bool gbMEM::insertCart(std::string game){
 		}
 	}
 	else {
-		printf("\n Unable to load Cartrage!\n");
+		printf("\n Unable to load cartage!\n");
 		return false;
 	}
     
-    //Print out Title of Game Cartrage! EPIC!
-    printf("\n loaded Cartrage - ");
+    //Print out Title of Game cartage! EPIC!
+    printf("\n loaded cartage - ");
     for (int i = 0x134; i < 0x142; i++) {
         std::cout << ((char)MEM[i]);
     }
@@ -428,6 +431,7 @@ bool gbMEM::setMBC(uint8_t code) {
 		return false;
 	}
 }
+
 bool gbMEM::setBanks(uint8_t code) {
 	banks = 0x0002;
 	banks <<= (code);
@@ -473,11 +477,14 @@ bool gbMEM::setRam(uint8_t code) {
 	}
 	return true;
 }
+
 bool gbMEM::saveRam() {
 	if (ramBanks > 0 && battery) {
 		memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
-		std::ofstream file("SAVES/" + (game) + ".SAV");
-		file.open("SAVES/" + (game) + ".SAV", std::ios::out | std::ios::binary);
+		mkdir(SAVE_DIR, 0777);
+		// TODO: Fix Saves string
+		std::ofstream file("SAVES/save.SAV");
+		file.open("SAVES/save.SAV", std::ios::out | std::ios::binary);
 		if (file.is_open())
 		{
 			file.clear();
@@ -508,6 +515,7 @@ bool gbMEM::swapWramBank(uint8_t bank)
 	memcpy(MEM + 0xD000, Wram + (WramBank * 0x1000), 0x1000);
 	return true;
 }
+
 bool gbMEM::swapVramBank(uint8_t bank)
 {
 	// printf("Swap Vram bank - GBC\n");

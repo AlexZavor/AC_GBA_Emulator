@@ -7,5 +7,5 @@ void printInputData(inputData data){
 
 void resetInputData(inputData *data)
 {
-    *data = {0,0,0,0,0,0,0,0,0,0};
+    *data = {0,0,0,0,0,0, 0,0, 0,0, 0};
 }

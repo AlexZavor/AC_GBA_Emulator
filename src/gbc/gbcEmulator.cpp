@@ -5,12 +5,12 @@ gbcEmulator::gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
     CPU = new gbCPU(MEM);
     CPU->setColor();
     PPU = new gbcPPU(MEM, renderer, texture);
-    gbAPU().APU_setMEM(MEM);
+    // gbAPU().APU_setMEM(MEM);
 }
 
 gbcEmulator::~gbcEmulator()
 {
-    gbAPU().APU_clearMEM();
+    // gbAPU().APU_clearMEM();
     delete MEM;
     // delete CPU;
     // delete PPU;
