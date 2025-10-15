@@ -41,10 +41,12 @@ void loadDir(std::vector<game>* Roms, char* directory){
 			}
 			else if(file.name[i-1] == 'c' && file.name[i-2] == 'b' && file.name[i-3] == 'g' && file.name[i-4] == '.'){
                 g.system = GBC;
+                g.has_save = checkSave(file.name);
 				Roms->push_back(g);
 			}
 			else if(file.name[i-1] == 'a' && file.name[i-2] == 'b' && file.name[i-3] == 'g' && file.name[i-4] == '.'){
                 g.system = GBA;
+                g.has_save = checkSave(file.name);
 				Roms->push_back(g);
 			}
         }

@@ -8,6 +8,7 @@
 #include "timer.h"
 
 #include "gb/gbEmulator.h"
+#include "gbc/gbcEmulator.h"
 
 #define BKG_COLOR 12, 12, 32, 255
 #define RED     {255,   0,   0}
@@ -62,33 +63,32 @@ void menu_run(){
         resetInputData(&input);
         game* Game = &Roms[selection];
         switch (Game->system) {
-            // TODO: Start emulators from menu
         case GB:
-            //Create Emulator
-            // printf("Started GB Game\n");
-            // menu_alert(ALERT_INFO,"Game boy game started!");
             gbEmulator_init(renderer, e);
-            gbEmulator_insertCart(Game);
-            gbEmulator_run();
+            if(!gbEmulator_insertCart(Game)){
+                menu_alert(ALERT_ERROR,"Game Could not be loaded!");
+            }else{
+                gbEmulator_run();
+            }
             gbEmulator_deinit();
-            timer_print_data();
             break;
         case GBC:
-            //Create Emulator
-            printf("Started GBC Game\n");
-            menu_alert(ALERT_WARNING,"Game boy Color game started!");
-            resetInputData(&input);
+            gbcEmulator_init(renderer, e);
+            if(!gbcEmulator_insertCart(Game)){
+                menu_alert(ALERT_ERROR,"Game Could not be loaded!");
+            }else{
+                gbcEmulator_run();
+            }
+            gbcEmulator_deinit();
             break;
         case GBA:
+            // TODO: Start GBA emulator from menu
             //Create Emulator
-            printf("Started GBA Game\n");
             menu_alert(ALERT_ERROR,"Game boy Advance game started!");
-            resetInputData(&input);
             break;
         }
-        // #ifdef FPS_COUNT
-        //     printf("max - %f, min - %f\n", maxTime, minTime);
-        // #endif
+        resetInputData(&input);
+        timer_print_data();
     }
     // Delete save file
     if (input.B){

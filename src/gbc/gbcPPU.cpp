@@ -1,10 +1,10 @@
 #include "gbc/gbcPPU.h"
 
-gbcPPU::gbcPPU(gbMEM *memory, SDL_Renderer *rend, SDL_Texture *tex) {
+gbcPPU::gbcPPU(gbMEM *memory, SDL_Renderer *rend) {
     MEM = memory;
     dMEM = memory->MEM;
     renderer = rend;
-	texture = tex;
+	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
 	lastDMA = dMEM[0xff55];
 }
 
@@ -102,8 +102,6 @@ void gbcPPU::renderFrame() {
         pitch /= sizeof(uint32_t);
 
         // Draw frame to texture
-
-		// TODO: Fix for Scale
         for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
 			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
 				uint16_t data =  Vram[y][x];
@@ -119,7 +117,6 @@ void gbcPPU::renderFrame() {
         SDL_UnlockTexture(texture);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
     }
-	memset(Vram,0,(160*144));
 	return;
 }
 

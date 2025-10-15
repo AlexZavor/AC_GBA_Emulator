@@ -9,19 +9,19 @@ Menu
 
 GB
 	PPU
+	    sprite priority?
+	    flickering?
 	MEM
-		lots of crashing
 	CPU
 GBC
 	PPU
-		Priority
-	Audio!
+		flickering
 GBA
+	Start Research
 */
 
 // TODO: Reorganize system from C++ to C based (init and update func.)
 // TODO: GB sub-systems refactor (cpu macros, better mem unit)
-// TODO: input base functions for doing some reading easier than big copy paste
 
 
 

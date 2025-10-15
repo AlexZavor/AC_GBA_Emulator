@@ -8,15 +8,14 @@
 #include "timer.h"
 
 static SDL_Renderer* renderer;
-static SDL_Texture* texture;
-gbMEM* MEM;
-gbCPU* CPU;
-gbPPU* PPU; 
+static gbMEM* MEM;
+static gbCPU* CPU;
+static gbPPU* PPU; 
 static inputData input;
 static SDL_Event* e;
 
-uint8_t inputButtons;
-uint8_t inputDpad;
+static uint8_t inputButtons;
+static uint8_t inputDpad;
 
 // Read relevant input for the GB Emulator.
 void gbEmulator_input(){ 
@@ -39,7 +38,6 @@ void gbEmulator_init(SDL_Renderer* render, SDL_Event* event) {
 }
 
 void gbEmulator_deinit(){
-    SDL_DestroyTexture(texture);
     delete(MEM);
     delete(CPU);
     delete(PPU);

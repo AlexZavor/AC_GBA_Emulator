@@ -1,30 +1,16 @@
 #ifndef GBCEMULATOR_H
 #define GBCEMULATOR_H
 
-#include <stdbool.h>
-#include <stdio.h>
 #include "SDL.h"
-#include "inputData.h"
-#include "gb/gbMEM.h"
-#include "gb/gbCPU.h"
-#include "gb/gbAPU.h"
-#include "gbc/gbcPPU.h"
+#include "game.h"
 
-class gbcEmulator{
-    private:
-        gbMEM* MEM;
-        gbCPU* CPU;
-        gbcPPU* PPU;
-    public:
-        //Constructor. should initialize things like memory and prepare for first instruction
-        gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture);
-        //Deconstructor. saves game, deletes old things
-        ~gbcEmulator();
-        //Calls the GB Emulator to run for one frame and return the output
-        void runFrame(inputData input);
-        //Inserts a cartage into the Game Boy
-        bool insertCart(std::string game);
-
-};
+// Initialize Game boy emulator.
+void gbcEmulator_init(SDL_Renderer* render, SDL_Event* event);
+// Deinitialize Game boy emulator.
+void gbcEmulator_deinit();
+// Hand control over to the game boy emulator, returns on an exit
+int gbcEmulator_run();
+// Insert Cartage into gb emulator
+int gbcEmulator_insertCart(game* game);
 
 #endif /* GBCEMULATOR_H */

@@ -24,7 +24,7 @@ class gbcPPU{
         uint8_t lastDMA;
 
     public:
-        gbcPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* tex);
+        gbcPPU(gbMEM* memory, SDL_Renderer* rend);
         void drawLine();
         uint32_t updatePPU(int cycles);
 

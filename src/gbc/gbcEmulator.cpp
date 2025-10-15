@@ -1,27 +1,54 @@
 #include "gbc/gbcEmulator.h"
 
-gbcEmulator::gbcEmulator(SDL_Renderer* renderer, SDL_Texture* texture) {
+#include "inputData.h"
+// #include "gb/gbAPU.h"
+#include "gb/gbMEM.h"
+#include "gb/gbCPU.h"
+#include "gbc/gbcPPU.h"
+#include "timer.h"
+
+static SDL_Renderer* renderer;
+static gbMEM* MEM;
+static gbCPU* CPU;
+static gbcPPU* PPU; 
+static inputData input;
+static SDL_Event* e;
+
+static uint8_t inputButtons;
+static uint8_t inputDpad;
+
+// Read relevant input for the GB Emulator.
+void gbcEmulator_input(){ 
+    readInput(&input, e);
+    
+    //Formatting input data
+    inputButtons = 0x1F - (input.start<<3) - (input.sel<<2) - (input.B<<1) - input.A;
+    inputDpad    = 0x2F - (input.down<<3) - (input.up<<2) - (input.left<<1) - input.right;
+}
+
+void gbcEmulator_init(SDL_Renderer* render, SDL_Event* event) {
+    renderer = render;
+	resetInputData(&input);
+    e = event;
+    // init mem, cpu, and ppu
     MEM = new gbMEM();
     CPU = new gbCPU(MEM);
-    CPU->setColor();
-    PPU = new gbcPPU(MEM, renderer, texture);
+    PPU = new gbcPPU(MEM, renderer);
     // gbAPU().APU_setMEM(MEM);
 }
 
-gbcEmulator::~gbcEmulator()
-{
-    // gbAPU().APU_clearMEM();
-    delete MEM;
-    // delete CPU;
-    // delete PPU;
+void gbcEmulator_deinit(){
+    delete(MEM);
+    delete(CPU);
+    delete(PPU);
 }
 
-void gbcEmulator::runFrame(inputData input) {
+int gbcEmulator_run() {
+    while(true){
+    timer_start();
+    gbcEmulator_input();
+    if(input.quit) return 0;
 
-    //Formatting input data
-    uint8_t inputButtons = 0x1F - (input.start<<3) - (input.sel<<2) - (input.B<<1) - input.A;
-    uint8_t inputDpad    = 0x2F - (input.down<<3) - (input.up<<2) - (input.left<<1) - input.right;
-    
     for (uint8_t line = 0; line < 154; line++)
     {
         static int cycle_count = 0;
@@ -61,15 +88,19 @@ void gbcEmulator::runFrame(inputData input) {
         PPU->drawLine();
     }
     PPU->renderFrame();
+    SDL_RenderPresent(renderer);
+    timer_end();
+    timer_buff();
+    }
 }
 
-bool gbcEmulator::insertCart(std::string game) {
-    // if(MEM->insertCart(game)) {
-        // CPU->setColor();
-        // return true;
-    // }
-    // else {
+int gbcEmulator_insertCart(game* game) {
+    if(MEM->insertCart(game)) {
+        CPU->setColor();
+        return true;
+    }
+    else {
         printf("ABORTING\n");
         return false;
-    // }
+    }
 }

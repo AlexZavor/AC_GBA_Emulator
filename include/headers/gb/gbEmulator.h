@@ -6,6 +6,7 @@
 
 // Initialize Game boy emulator.
 void gbEmulator_init(SDL_Renderer* render, SDL_Event* event);
+// Deinitialize Game boy emulator.
 void gbEmulator_deinit();
 // Hand control over to the game boy emulator, returns on an exit
 int gbEmulator_run();
