@@ -1,5 +1,5 @@
-#ifndef GAMES_H
-#define GAMES_H
+#ifndef GAME_H
+#define GAME_H
 
 #include "tinydir.h"
 #include "globals.h"
@@ -14,9 +14,9 @@ typedef struct {
 } game;
 
 // Load All Games from Global "GAME_DIR" Folder into Roms list
-void games_loadGames(std::vector<game>* Roms);
+void game_loadGames(std::vector<game>* Roms);
 
 // Remove save data from game
-void games_removeSave(game* game);
+void game_removeSave(game* game);
 
-#endif
+#endif // GAME_H

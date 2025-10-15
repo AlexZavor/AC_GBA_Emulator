@@ -1,4 +1,4 @@
-#include "games.h"
+#include "game.h"
 
 bool checkSave(char* name){
     char saveFile[300] = SAVE_DIR;
@@ -56,12 +56,12 @@ void loadDir(std::vector<game>* Roms, char* directory){
 }
 
 // Load All Games from Global "GAME_DIR" Folder into Roms list
-void games_loadGames(std::vector<game>* Roms){
+void game_loadGames(std::vector<game>* Roms){
     mkdir(GAME_DIR, 0777); // If ./ROMS/ doesn't exist yet.
     loadDir(Roms, (char*)GAME_DIR); // Recursive for file trees.
 }
 
-void games_removeSave(game* game){
+void game_removeSave(game* game){
     char saveFile[300] = SAVE_DIR;
     strcat(saveFile, game->name.data());
     strcat(saveFile, ".SAV");

@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h> // memset
+#include "SDL.h"
 
 //Key definitions
 #define KEY_UP		SDLK_UP
@@ -42,5 +44,8 @@ void printInputData(inputData data);
 
 // sets all input data to 0
 void resetInputData(inputData *data);
+
+// Reads all input into data from keyboard
+void readInput(inputData *data, SDL_Event* e);
 
 #endif // INPUTDATA_H

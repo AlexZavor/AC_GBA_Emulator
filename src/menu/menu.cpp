@@ -3,7 +3,7 @@
 #include <vector>
 #include "SDL_ttf.h"
 #include "inputData.h"
-#include "games.h"
+#include "game.h"
 #include "string.h"
 #include "timer.h"
 
@@ -28,7 +28,7 @@ unsigned int selection = 0;
 void menu_init(SDL_Renderer* render, SDL_Event* event){
     renderer = render;
     quit = false;
-	games_loadGames(&Roms);
+	game_loadGames(&Roms);
 	resetInputData(&input);
     e = event;
     font = TTF_OpenFont("../fonts/Minecraft.ttf", 16);
@@ -97,7 +97,7 @@ void menu_run(){
         if(Game->has_save){
             menu_alert(ALERT_WARNING, "Delete Save? A-yes B-no");
             if(input.A){
-                games_removeSave(Game);
+                game_removeSave(Game);
             }
             resetInputData(&input);
         }
@@ -182,75 +182,7 @@ void menu_run(){
 
 // Read input related to the Menu.
 void menu_input(){
-    //Handle events on queue for menu
-    while( SDL_PollEvent( e ) != 0 ) {
-        //User requests quit (alt+f4 or X button)
-        if( e->type == QUIT) {
-            input.quit = true;
-        }
-        //User presses a key
-        else if( e->type == SDL_KEYDOWN ) {
-            switch( e->key.keysym.sym ) {
-                case KEY_UP:
-                input.up = 1;
-                break;
-                case KEY_DOWN:
-                input.down = 1;
-                break;
-                case KEY_LEFT:
-                input.left = 1;
-                break;
-                case KEY_RIGHT:
-                input.right = 1;
-                break;
-                case KEY_A:
-                input.A = 1;
-                break;
-                case KEY_B:
-                input.B = 1;
-                break;
-                case KEY_SEL:
-                input.sel = 1;
-                break;
-                case KEY_START:
-                input.start = 1;
-                break;
-                default:
-                break;
-            }
-        }
-        else if( e->type == SDL_KEYUP ) {
-            //Select surfaces based on key press
-            switch( e->key.keysym.sym ) {
-                case SDLK_UP:
-                input.up = 0;
-                break;
-                case SDLK_DOWN:
-                input.down = 0;
-                break;
-                case SDLK_LEFT:
-                input.left = 0;
-                break;
-                case SDLK_RIGHT:
-                input.right = 0;
-                break;
-                case KEY_A:
-                input.A = 0;
-                break;
-                case KEY_B:
-                input.B = 0;
-                break;
-                case KEY_SEL:
-                input.sel = 0;
-                break;
-                case KEY_START:
-                input.start = 0;
-                break;
-                default:
-                break;
-            }
-        }
-    }
+    readInput(&input, e);
 }
 
 // Draw Alert on top of screen, used for displaying errors and stuff.

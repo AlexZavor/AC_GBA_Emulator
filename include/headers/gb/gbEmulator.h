@@ -2,7 +2,7 @@
 #define GBEMULATOR_H
 
 #include "SDL.h"
-#include "games.h"
+#include "game.h"
 
 // Initialize Game boy emulator.
 void gbEmulator_init(SDL_Renderer* render, SDL_Event* event);
