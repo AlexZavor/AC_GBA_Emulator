@@ -263,14 +263,14 @@ void gbMEM::setColor() {
 	MEM[0xFF70] = 0xf8;
 }
 
-bool gbMEM::insertCart(std::string game){
+bool gbMEM::insertCart(game* g){
 	std::streampos size;
-	std::ifstream file2(game, std::ios::in | std::ios::binary | std::ios::ate);
+	std::ifstream file2(GAME_DIR + g->name, std::ios::in | std::ios::binary | std::ios::ate);
 	if (file2.is_open())
 	{
 		size = file2.tellg();
 		cartage = new char[(int)size];
-		this->game = game.erase(game.size() - 3, game.size() - 1).erase(0,5);
+		game_p = g;
 		file2.seekg(0, std::ios::beg);
 		file2.read(cartage, size);
 		file2.close();
@@ -462,7 +462,7 @@ bool gbMEM::setRam(uint8_t code) {
 	ram = new char[(int)ramBanks * 0x2000];
 	if (ramBanks && battery) {
 		std::cout << "loading save - ";
-		std::ifstream file("SAVES/" + (game) + ".SAV", std::ios::in | std::ios::binary | std::ios::ate);
+		std::ifstream file(SAVE_DIR + (game_p->name) + ".SAV", std::ios::in | std::ios::binary | std::ios::ate);
 		if (file.is_open())
 		{
 			file.seekg(0, std::ios::beg);
@@ -482,18 +482,19 @@ bool gbMEM::saveRam() {
 	if (ramBanks > 0 && battery) {
 		memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
 		mkdir(SAVE_DIR, 0777);
-		// TODO: Fix Saves string
-		std::ofstream file("SAVES/save.SAV");
-		file.open("SAVES/save.SAV", std::ios::out | std::ios::binary);
+		std::ofstream file(SAVE_DIR + (game_p->name) + ".SAV");
+		file.open(SAVE_DIR + (game_p->name) + ".SAV", std::ios::out | std::ios::binary);
 		if (file.is_open())
 		{
 			file.clear();
 			file.write((char*)ram, (int)ramBanks * 0x2000);
 			file.close();
 			std::cout << "Saved game \n";
+			game_p->has_save = true;
 			return 1;
 		}
 		else {
+			game_p->has_save = false;
 			std::cout << "failed to save \n";
 			return 0;
 		}

@@ -64,12 +64,12 @@ void gbcEmulator::runFrame(inputData input) {
 }
 
 bool gbcEmulator::insertCart(std::string game) {
-    if(MEM->insertCart(game)) {
-        CPU->setColor();
-        return true;
-    }
-    else {
+    // if(MEM->insertCart(game)) {
+        // CPU->setColor();
+        // return true;
+    // }
+    // else {
         printf("ABORTING\n");
         return false;
-    }
+    // }
 }

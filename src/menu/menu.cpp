@@ -60,8 +60,8 @@ void menu_run(){
     // Start up Consoles
     if (input.A || input.sel || input.start) {
         resetInputData(&input);
-        game Game = Roms[selection];
-        switch (Game.system) {
+        game* Game = &Roms[selection];
+        switch (Game->system) {
             // TODO: Start emulators from menu
         case GB:
             //Create Emulator
@@ -77,17 +77,33 @@ void menu_run(){
             //Create Emulator
             printf("Started GBC Game\n");
             menu_alert(ALERT_WARNING,"Game boy Color game started!");
+            resetInputData(&input);
             break;
         case GBA:
             //Create Emulator
             printf("Started GBA Game\n");
             menu_alert(ALERT_ERROR,"Game boy Advance game started!");
+            resetInputData(&input);
             break;
         }
         // #ifdef FPS_COUNT
         //     printf("max - %f, min - %f\n", maxTime, minTime);
         // #endif
     }
+    // Delete save file
+    if (input.B){
+        resetInputData(&input);
+        game* Game = &Roms[selection];
+        if(Game->has_save){
+            menu_alert(ALERT_WARNING, "Delete Save? A-yes B-no");
+            if(input.A){
+                games_removeSave(Game);
+            }
+            resetInputData(&input);
+        }
+
+    }
+
 
     // -------------Render Menu-----------------
     // Clear Screen to Background color
@@ -129,6 +145,22 @@ void menu_run(){
             // Don't forget to free your surface and texture
             SDL_FreeSurface(surfaceMessage);
             SDL_DestroyTexture(Message);
+
+            if(Roms[i + (page * 13)].has_save){
+                SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+                SDL_Point save_lines[10];
+                save_lines[0] = {142,(int)(y)};
+                save_lines[1] = {148,(int)(y)};
+                save_lines[2] = {150,(int)(y+2)};
+                save_lines[3] = {150,(int)(y+8)};
+                save_lines[4] = {144,(int)(y+8)};
+                save_lines[5] = {144,(int)(y+5)};
+                save_lines[6] = {148,(int)(y+5)};
+                save_lines[7] = {148,(int)(y+8)};
+                save_lines[8] = {142,(int)(y+8)};
+                save_lines[9] = {142,(int)(y)};
+                SDL_RenderDrawLines(renderer, save_lines, 10);
+            }
 
         }
         y += 10;
@@ -237,10 +269,10 @@ void menu_alert(AlertLevel level, const char* text){
         color = {0xFF, 0xFF, 0xFF};
     break;
     case ALERT_WARNING:
-        color = {0xFF, 0x44, 0x44};
+        color = {0x88, 0x44, 0x00};
     break;
     case ALERT_ERROR:
-        color = RED;
+        color = {0x88, 0x00, 0x00};
     break;
     default:
         
@@ -268,7 +300,7 @@ void menu_alert(AlertLevel level, const char* text){
             return;
         }
     }
-    resetInputData(&input);
+    // resetInputData(&input);
 
 }
 

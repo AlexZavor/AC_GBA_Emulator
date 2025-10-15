@@ -20,6 +20,9 @@ Roms go in ./build/ROMS/
 and Saves will be in ./build/SAVES/
 
 ### Linux
+
+requires SDL and SDL_TTF
+
 ```bash
 cd ./build
 cmake ..
@@ -34,3 +37,22 @@ and Saves will be in ./build/SAVES/
 
 
 <img src="./res/Full_Transparent_Advance.png" alt="Icon" width="300"/>
+
+
+## Credits
+
+### Tinydir
+
+Copyright (c) 2013-2021, tinydir authors:
+
+- Cong Xu
+
+- Lautis Sun
+
+- Baudouin Feildel
+
+- Andargor <andargor@yahoo.com>
+
+All rights reserved.
+
+**see source (`./include/headers/tinydir.h`) for full copyright details**

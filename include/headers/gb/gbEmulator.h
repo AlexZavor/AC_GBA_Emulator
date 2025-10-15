@@ -10,6 +10,6 @@ void gbEmulator_deinit();
 // Hand control over to the game boy emulator, returns on an exit
 int gbEmulator_run();
 // Insert Cartage into gb emulator
-int gbEmulator_insertCart(game game);
+int gbEmulator_insertCart(game* game);
 
 #endif /* GBEMULATOR_H */

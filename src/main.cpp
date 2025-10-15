@@ -20,7 +20,6 @@ GBA
 */
 
 // TODO: Reorganize system from C++ to C based (init and update func.)
-// TODO: Fix Saves (Name concatenation)
 // TODO: GB sub-systems refactor (cpu macros, better mem unit)
 // TODO: input base functions for doing some reading easier than big copy paste
 

@@ -9,6 +9,7 @@
 #include "string.h"
 #include "stdlib.h"
 #include "stdio.h"
+#include "games.h"
 
 
 typedef struct {
@@ -84,7 +85,7 @@ class gbMEM{
         bool color = false;
 
         // Name of current game
-        std::string game;
+        game* game_p;
 
     public:
         gbMEM();
@@ -99,7 +100,7 @@ class gbMEM{
         void andWrite(uint16_t address, uint8_t data);
 
         // insert and save a cart to memory
-        bool insertCart(std::string game);
+        bool insertCart(game* g);
 
         // set memory as for a game boy color        
         void setColor();

@@ -16,4 +16,7 @@ typedef struct {
 // Load All Games from Global "GAME_DIR" Folder into Roms list
 void games_loadGames(std::vector<game>* Roms);
 
+// Remove save data from game
+void games_removeSave(game* game);
+
 #endif

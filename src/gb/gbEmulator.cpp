@@ -162,8 +162,8 @@ int gbEmulator_run() {
     }
 }
 
-int gbEmulator_insertCart(game game) {
-    if(MEM->insertCart(GAME_DIR + game.name)) {
+int gbEmulator_insertCart(game* game) {
+    if(MEM->insertCart(game)) {
         return true;
     }
     else {
