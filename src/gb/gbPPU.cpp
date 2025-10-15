@@ -1,22 +1,10 @@
 #include "gb/gbPPU.h"
 
-/*
-PPU Tests
-Basic old graphics		max - 57, min - 0
-No graphics 			max - 3,  min - 0
-No SDL_Renderer calls	max - 5,  min - 0
-Write to Array			max - 6,  min - 0
-Render array once 		max - 59, min - 11
-Pixel pusher 			max - 17, min - 2 (but average was like 3-4!)
-Final design			max - 10.7, min - 4.1 (better when plugged in)
-*/
-// #define GREEN_PALLET
-
-gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* tex) {
+gbPPU::gbPPU(gbMEM* memory, SDL_Renderer* rend) {
     MEM = memory;
     dMEM = memory->MEM;
     renderer = rend;
-	texture = tex;
+	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
 }
 
 void gbPPU::drawLine() {
@@ -110,56 +98,61 @@ void gbPPU::renderFrame() {
         // as it will always be a multiple of four
         pitch /= sizeof(uint32_t);
 
-        // Draw frame to texture
-        for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
-			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
+        // Draw frame to texture (Parallelizing didn't work, threads are too slow to spin up)
+		uint32_t t;
+        for (uint32_t x = 0; x < (SCREEN_HEIGHT); x+=SCALE){
+			for(uint32_t y = 0; y < (SCREEN_WIDTH); y+=SCALE){
 				#ifdef GREEN_PALLET
 				switch (Vram[y/SCALE][x/SCALE])
 				{
 				case 0:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x9bbc0f;
+					t = 0xFF9bbc0f;
 					break;
 				case 1:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x8bac0f;
+					t = 0xFF8bac0f;
 					break;
 				case 2:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x306230;
+					t = 0xFF306230;
 					break;
 				case 3:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x0f380f;
+					t = 0xFF0f380f;
 					break;
 				default:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xfc03e8;
+            		t = 0xFFfc03e8;
 					break;
 				}
 				#else
 				switch (Vram[y/SCALE][x/SCALE])
 				{
 				case 0:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xffffff;
+            		f = 0xFFffffff;
 					break;
 				case 1:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xa9a9a9;
+            		f = 0xFFa9a9a9;
 					break;
 				case 2:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x545454;
+            		f = 0xFF545454;
 					break;
 				case 3:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0x000000;
+            		f = 0xFF000000;
 					break;
 				default:
-            		pixelBuffer[(x*(SCREEN_WIDTH)) + y] = (0xff << 24) | 0xfc03e8;
+            		f = 0xFFfc03e8;
 					break;
 				}
 				#endif
+
+				// fills in 4x4 block 
+				for (int dx = 0; dx < SCALE-LINED_DRAWING; dx++)
+					for (int dy = 0; dy < SCALE; dy++)
+						pixelBuffer[((x+dx)*(SCREEN_WIDTH)) + y+dy] = t;
 			}
 		}
-
-        // Unlock the texture in VRAM and send to renderer!
+        
+		// Unlock the texture in VRAM and send to renderer!
         SDL_UnlockTexture(texture);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
     }
-	memset(Vram,0,(160*144));
 	return;
 }
 

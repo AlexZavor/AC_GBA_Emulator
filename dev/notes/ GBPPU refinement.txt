@@ -1,0 +1,34 @@
+Test: Start Deadeus.gb for 10 sec, 600 sample avg. Unplugged
+
+                    Total       added
+CPU only:           1.720ms     +0
++PPU Update:        2.287ms     +0.567ms
++PPU Draw Line:     6.951ms     +4.664ms
++PPU Render Frame: 11.659ms     +4.708ms
+
+
+Draw Line:
+No Draw Line        2.287ms     +0
+Draw: none          2.387ms     ~0
+Draw: background    4.750ms     +2.3ms
+Draw: window        4.509ms     +2.1ms
+Draw: sprites       2.388ms     ~0      * I don't think there are any sprites on the title screen
+Draw: all           6.951ms     +4.664
+
+Render Frame:
+No Render Frame     6.951ms     +0
+-seq section        8.411ms     +1.5ms  * Just render cpy and texture lock
++seq section                    +3.2ms
+-Render Cpy(SDL)   12.000ms     ~0
+Seq Render Frame   11.659ms     +4.708ms
+quarter Draw        8.782ms             * not fully drawn
+quarter draw x2     9.254ms------------Still bad
+quarter Draw x4    10.810ms
+x4 calc 1          10.702ms     -1ms    * Going with This
+4 Thread Frame     11.494ms     -1.2ms
+
+Overall, Threading the PPU didn't really help because both fork and pthread was too slow to start up.
+not giving me enough performance. but I did improve my drawing function still.
+
+It could possibly still be improved by starting up threads in the init function and using "Condition Variables" 
+to tell them when to run. But that'll be tested later.

@@ -13,6 +13,7 @@ typedef enum{
 #define SCREEN_WIDTH (160 * SCALE)
 #define SCREEN_HEIGHT (144 * SCALE)
 #define GREEN_PALLET
+#define LINED_DRAWING 1  // makes horizontal lines, also improves FPS slightly
 
 // Directorys
 #define GAME_DIR "./ROMS/"

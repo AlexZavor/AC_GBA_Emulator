@@ -107,8 +107,7 @@ void gbEmulator_init(SDL_Renderer* render, SDL_Event* event) {
     // init mem, cpu, and ppu
     MEM = new gbMEM();
     CPU = new gbCPU(MEM);
-	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
-    PPU = new gbPPU(MEM, renderer, texture);
+    PPU = new gbPPU(MEM, renderer);
     // gbAPU().APU_setMEM(MEM);
 }
 

@@ -9,7 +9,6 @@ Menu
 
 GB
 	PPU
-		figure out flickering?
 	MEM
 		lots of crashing
 	CPU

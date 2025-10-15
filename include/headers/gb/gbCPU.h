@@ -54,7 +54,7 @@ class gbCPU{
         gbMEM* MEM;
         uint8_t* dMEM;
         //Main CPU Registers, A,B,C,D,E,F,H,L,sp,pc.
-        //also adressible through common combinations like HL or AF
+        //also addressable through common combinations like HL or AF
         struct reg registers;
 
         
@@ -80,17 +80,17 @@ class gbCPU{
         //set registers to correct values
         void initCpu();
         //Push data onto the stack
-        void PushStack(uint8_t data);
+        inline void PushStack(uint8_t data);
         //Pop data off stack
-        uint8_t PopStack();
+        inline uint8_t PopStack();
         //Set of extra instructions
         uint8_t CBPrefix();
         //Flag setting functions
-        void setZ(bool set);
-        void setN(bool set);
-        void setH(bool set);
-        void setC(bool set);
-        //for error Handeling
+        inline void setZ(bool set);
+        inline void setN(bool set);
+        inline void setH(bool set);
+        inline void setC(bool set);
+        //for error Handling
         void Failure(int code);
 
 };

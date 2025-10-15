@@ -3,13 +3,13 @@
 #include "SDL.h"
 #include "stdio.h"
 
-#define AVG_BUFFER_SIZE 100
 
 #ifdef DEBUG
-	#define FPS_COUNT
+#define FPS_COUNT
 #endif
 
 #ifdef FPS_COUNT
+    #define AVG_BUFFER_SIZE 60
 	static float minTime = 999;
 	static float maxTime = 0;
     static float avg_buffer[AVG_BUFFER_SIZE];

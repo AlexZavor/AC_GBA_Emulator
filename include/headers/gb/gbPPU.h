@@ -17,7 +17,7 @@ class gbPPU{
         uint8_t Vram[160][144];
 
     public:
-        gbPPU(gbMEM* memory, SDL_Renderer* rend, SDL_Texture* tex);
+        gbPPU(gbMEM* memory, SDL_Renderer* rend);
         void drawLine();
         void updatePPU(int cycles);
 
