@@ -102,9 +102,11 @@ void gbcPPU::renderFrame() {
         pitch /= sizeof(uint32_t);
 
         // Draw frame to texture
+
+		// TODO: Fix for Scale
         for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
 			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
-				uint16_t data =  Vram[y/SCALE][x/SCALE];
+				uint16_t data =  Vram[y][x];
 				uint8_t red = data&0x001F ;
 				uint8_t green = (data&0x03E0)>>5;
 				uint8_t blue = (data&0x7C00)>>10;

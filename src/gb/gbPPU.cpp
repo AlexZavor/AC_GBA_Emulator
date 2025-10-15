@@ -100,10 +100,10 @@ void gbPPU::renderFrame() {
 
         // Draw frame to texture (Parallelizing didn't work, threads are too slow to spin up)
 		uint32_t t;
-        for (uint32_t x = 0; x < (SCREEN_HEIGHT); x+=SCALE){
-			for(uint32_t y = 0; y < (SCREEN_WIDTH); y+=SCALE){
+        for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
+			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
+				switch (Vram[y][x])
 				#ifdef GREEN_PALLET
-				switch (Vram[y/SCALE][x/SCALE])
 				{
 				case 0:
 					t = 0xFF9bbc0f;
@@ -122,7 +122,6 @@ void gbPPU::renderFrame() {
 					break;
 				}
 				#else
-				switch (Vram[y/SCALE][x/SCALE])
 				{
 				case 0:
             		f = 0xFFffffff;
@@ -141,11 +140,7 @@ void gbPPU::renderFrame() {
 					break;
 				}
 				#endif
-
-				// fills in 4x4 block 
-				for (int dx = 0; dx < SCALE-LINED_DRAWING; dx++)
-					for (int dy = 0; dy < SCALE; dy++)
-						pixelBuffer[((x+dx)*(SCREEN_WIDTH)) + y+dy] = t;
+				pixelBuffer[((x)*(SCREEN_WIDTH)) + y] = t;
 			}
 		}
         

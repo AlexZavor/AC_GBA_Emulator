@@ -32,3 +32,6 @@ not giving me enough performance. but I did improve my drawing function still.
 
 It could possibly still be improved by starting up threads in the init function and using "Condition Variables" 
 to tell them when to run. But that'll be tested later.
+
+Why didn't I think of this before? Have the GPU do it! I'm drawing x4 scale, and could just tell the GPU to scale it up for me.
+That way I only need to draw 1/16th of the pixels. and move less to the GPU.

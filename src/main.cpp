@@ -32,7 +32,7 @@ bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 		return 0;
 	}
 	//Create window
-	*window = SDL_CreateWindow( "--AC-GBA--", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
+	*window = SDL_CreateWindow( "--AC-GBA--", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH*SCALE, SCREEN_HEIGHT*SCALE, SDL_WINDOW_SHOWN );
 	if( *window == NULL ) {
 		printf( "Window could not be created! SDL_Error: %s\n", SDL_GetError() );
 		return 0;

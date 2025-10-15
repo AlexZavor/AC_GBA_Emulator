@@ -256,7 +256,7 @@ void menu_input(){
 // Draw Alert on top of screen, used for displaying errors and stuff.
 void menu_alert(AlertLevel level, const char* text){
     // Draw Box for text
-    SDL_Rect r = {0,(SCREEN_HEIGHT/SCALE)-24,SCREEN_WIDTH,24};
+    SDL_Rect r = {0,(SCREEN_HEIGHT)-24,SCREEN_WIDTH,24};
     SDL_SetRenderDrawColor(renderer, 0xAA, 0x88, 0xAA, 0xFF);
     SDL_RenderFillRect(renderer, &r);
     SDL_SetRenderDrawColor(renderer, 0x66, 0x44, 0x66, 0xFF);
