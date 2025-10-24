@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 
 project(GameBoyAdvanceEmulator  VERSION 1.0.0
         DESCRIPTION "C++ implemented emulator for the Game Boy Advance"
-        LANGUAGES CXX)
+        LANGUAGES C CXX)
         
 # Debug system that can be set TRUE or FALSE
 set(DEBUG TRUE)
@@ -14,7 +14,7 @@ include_directories(include/SDL2)
 
 ############### Main Build ###############
 
-file(GLOB_RECURSE GBA_SRC CONFIGURE_DEPENDS "src/***.cpp")
+file(GLOB_RECURSE GBA_SRC CONFIGURE_DEPENDS "src/***.c***")
 
 add_executable(GBA ${GBA_SRC})
 

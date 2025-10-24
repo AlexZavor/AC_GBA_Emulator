@@ -2,12 +2,12 @@
 #define MENU_H
 #include "SDL.h"
 
-enum AlertLevel {
+typedef enum {
     ALERT_NONE,
     ALERT_INFO,
     ALERT_WARNING,
     ALERT_ERROR
-};
+} AlertLevel_t;
 
 // Initialize menu and variables
 void menu_init(SDL_Renderer* render, SDL_Event* event);
@@ -20,7 +20,7 @@ void menu_run();
 void menu_input();
 
 // Draw Alert on top of screen, used for displaying errors and stuff.
-void menu_alert(AlertLevel level, const char* text);
+void menu_alert(AlertLevel_t level, const char* text);
 
 
 #endif // MENU_H

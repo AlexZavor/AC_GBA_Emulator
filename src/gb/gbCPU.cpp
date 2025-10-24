@@ -12,9 +12,7 @@ std::ofstream myfile;
 #define HMASK 0b00100000
 #define CMASK 0b00010000
 
-gbCPU::gbCPU(gbMEM* memory) {
-    MEM = memory;
-	dMEM = memory->MEM;
+gbCPU::gbCPU() {
     initCpu();
 }
 
@@ -22,7 +20,7 @@ uint8_t gbCPU::instruction(){
 	if(halted){
 		return 4;
 	}
-	switch (dMEM[registers.pc]) {
+	switch (gb_read(registers.pc)) {
 	case 0x00:      //NOP
 	{
 		registers.pc++;
@@ -32,7 +30,8 @@ uint8_t gbCPU::instruction(){
 	{
 		//load nn into BC
 		registers.pc++;
-		registers.bc = dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8);
+		// registers.bc = gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8);
+		registers.bc = gb_read16(registers.pc);
 		registers.pc++;//count past the two parameters
 		registers.pc++;
 		return 12;
@@ -40,7 +39,7 @@ uint8_t gbCPU::instruction(){
 	case 0x02:		//LD (BC), A
 	{
 		//Put A into memory at BC
-		MEM->write(registers.bc, registers.a);
+		gb_write(registers.bc, registers.a);
 		registers.pc++;
 		return 8;
 	}
@@ -75,7 +74,7 @@ uint8_t gbCPU::instruction(){
 	{
 	    //load n into b
 		registers.pc++;
-		registers.b = dMEM[registers.pc];
+		registers.b = gb_read(registers.pc);
 		registers.pc++;//count past param
 		return 8;
 	}
@@ -95,8 +94,8 @@ uint8_t gbCPU::instruction(){
 	{
 		//Put SP into memory at address nn
 		registers.pc++;
-		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8)	 , registers.sp & 0x00FF);
-		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8) + 1, (registers.sp & 0xFF00)>>8);
+		gb_write(gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8)	 , registers.sp & 0x00FF);
+		gb_write(gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8) + 1, (registers.sp & 0xFF00)>>8);
 		registers.pc++;//count past the two parameters
 		registers.pc++;
 		return 20;
@@ -114,7 +113,7 @@ uint8_t gbCPU::instruction(){
 	case 0x0A:		//LD A, (BC)
 	{
 		//Load value at address (BC) into A
-		registers.a = dMEM[registers.bc];
+		registers.a = gb_read(registers.bc);
 		registers.pc++;
 		return 8;
 	}
@@ -148,7 +147,7 @@ uint8_t gbCPU::instruction(){
 	case 0x0E:      //LD C, n
 	{
 	  //load n into C
-		registers.c = dMEM[registers.pc + 1];
+		registers.c = gb_read(registers.pc + 1);
 		registers.pc++;//count past param
 		registers.pc++;
 		return 8;
@@ -176,7 +175,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//load nn into register DE
 		registers.pc++;
-		registers.de = (dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8));
+		registers.de = (gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8));
 		registers.pc++;//count past the two parameters
 		registers.pc++;
 		return 12;
@@ -184,7 +183,7 @@ uint8_t gbCPU::instruction(){
 	case 0x12:		//LD (DE), A
 	{
 		//load A into the address (DE)
-		MEM->write(registers.de, registers.a);
+		gb_write(registers.de, registers.a);
 		registers.pc++;
 		return 12;
 	}
@@ -219,7 +218,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//load n into D
 		registers.pc++;
-		registers.d = dMEM[registers.pc];
+		registers.d = gb_read(registers.pc);
 		registers.pc++;//count past param
 		return 8;
 	}
@@ -239,7 +238,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//jump to current address + n (signed)
 		registers.pc++;
-		registers.pc += ((signed char)dMEM[registers.pc]);
+		registers.pc += ((signed char)gb_read(registers.pc));
 		registers.pc++;
 		return 12;
 	}
@@ -256,7 +255,7 @@ uint8_t gbCPU::instruction(){
 	case 0x1A:		//LD A, (DE)
 	{
 		//Load value at (DE) into A
-		registers.a = dMEM[registers.de];
+		registers.a = gb_read(registers.de);
 		registers.pc++;
 		return 8;
 	}
@@ -291,7 +290,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//load n into E
 		registers.pc++;
-		registers.e = dMEM[registers.pc];
+		registers.e = gb_read(registers.pc);
 		registers.pc++;//count past param
 		return 8;
 	}
@@ -312,7 +311,7 @@ uint8_t gbCPU::instruction(){
 	  //jump to current address plus n if Zflag is reset 
 		if (!(registers.f & ZMASK)) {
 			registers.pc++;
-			registers.pc += ((signed char)dMEM[registers.pc]); //forces twos complement
+			registers.pc += ((signed char)gb_read(registers.pc)); //forces twos complement
 			registers.pc++;
 			return 12;
 		}
@@ -326,7 +325,7 @@ uint8_t gbCPU::instruction(){
 	{
 	  //put value nn into HL, LSByte first
 		registers.pc++;
-		registers.hl = (dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8));
+		registers.hl = (gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8));
 		registers.pc++;//count past the two parameters
 		registers.pc++;
 		return 12;
@@ -334,7 +333,7 @@ uint8_t gbCPU::instruction(){
 	case 0x22:		//LDI (HL), A
 	{
 		//put memory in A into memory address HL, increment HL.
-		MEM->write(registers.hl, registers.a);
+		gb_write(registers.hl, registers.a);
 		registers.hl++;
 		registers.pc++;
 		return 8;
@@ -370,7 +369,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//load n into H
 		registers.pc++;
-		registers.h = dMEM[registers.pc];
+		registers.h = gb_read(registers.pc);
 		registers.pc++;//count past param
 		return 8;
 	}
@@ -397,7 +396,7 @@ uint8_t gbCPU::instruction(){
 		//jump to current address plus n if Zflag is set 
 		if (registers.f & ZMASK) {
 			registers.pc++;
-			registers.pc += ((signed char)dMEM[registers.pc]); //forces twos complement and adjusts for counting past instruction
+			registers.pc += ((signed char)gb_read(registers.pc)); //forces twos complement and adjusts for counting past instruction
 			registers.pc++;
 			return 12;
 		}
@@ -420,7 +419,7 @@ uint8_t gbCPU::instruction(){
 	case 0x2A:		//LD A, (HL+)
 	{
 		//put value at address HL into A and increment HL;
-		registers.a = dMEM[registers.hl];
+		registers.a = gb_read(registers.hl);
 		registers.hl++;
 		registers.pc++;
 		return 8;
@@ -456,7 +455,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//load n into 
 		registers.pc++;
-		registers.l = dMEM[registers.pc];
+		registers.l = gb_read(registers.pc);
 		registers.pc++;//count past param
 		return 8;
 	}
@@ -473,7 +472,7 @@ uint8_t gbCPU::instruction(){
 		//jump to current address plus n if Cflag is reset 
 		if (!(registers.f & CMASK)) {
 			registers.pc++;
-			registers.pc = registers.pc + ((signed char)dMEM[registers.pc]); //forces twos complement and adjusts for counting past instruction
+			registers.pc = registers.pc + ((signed char)gb_read(registers.pc)); //forces twos complement and adjusts for counting past instruction
 			registers.pc++;
 			return 12;
 		}
@@ -487,7 +486,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//set stack pointer to nn
 		registers.pc++;
-		registers.sp = dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8);
+		registers.sp = gb_read16(registers.pc);
 		registers.pc++;//count past the two parameters
 		registers.pc++;
 		return 12;
@@ -495,7 +494,7 @@ uint8_t gbCPU::instruction(){
 	case 0x32:      //LDD (HL), A
 	{
 	  //load data(decrement) from A into (HL)
-	  	MEM->write(registers.hl, registers.a);
+	  	gb_write(registers.hl, registers.a);
 		registers.hl--;
 		registers.pc++;
 		return 8;
@@ -510,9 +509,9 @@ uint8_t gbCPU::instruction(){
 	case 0x34:		//INC (HL)
 	{
 		//Increment data at address HL
-		MEM->write(registers.hl, dMEM[registers.hl] + 1);
-		setZ(!(dMEM[registers.hl]));
-		setH(dMEM[registers.hl] % 16 == 0);
+		gb_write(registers.hl, gb_read(registers.hl) + 1);
+		setZ(!(gb_read(registers.hl)));
+		setH(gb_read(registers.hl) % 16 == 0);
 		setN(0);
 		registers.pc++;
 		return 12;
@@ -520,9 +519,9 @@ uint8_t gbCPU::instruction(){
 	case 0x35:		//DEC (HL)
 	{
 		//Decrement data at address HL
-		setH(!(dMEM[registers.hl] & 0x0F));
-		MEM->write(registers.hl, dMEM[registers.hl] - 1);
-		setZ(!(dMEM[registers.hl]));
+		setH(!(gb_read(registers.hl) & 0x0F));
+		gb_write(registers.hl, gb_read(registers.hl) - 1);
+		setZ(!(gb_read(registers.hl)));
 		setN(1);
 		registers.pc++;
 		return 12;
@@ -531,7 +530,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//Load n into memory at (HL)
 		registers.pc++;
-		MEM->write(registers.hl, dMEM[registers.pc]);
+		gb_write(registers.hl, gb_read(registers.pc));
 		registers.pc++;//count past param
 		return 12;
 	}
@@ -549,7 +548,7 @@ uint8_t gbCPU::instruction(){
 		//jump to current address plus n if Cflag is set 
 		if (registers.f & CMASK) {
 			registers.pc++;
-			registers.pc = registers.pc + ((signed char)dMEM[registers.pc]); //forces twos complement and adjusts for counting past instruction
+			registers.pc = registers.pc + ((signed char)gb_read(registers.pc)); //forces twos complement and adjusts for counting past instruction
 			registers.pc++;
 			return 12;
 		}
@@ -572,7 +571,7 @@ uint8_t gbCPU::instruction(){
 	case 0x3A:		//LD A, (HL-)
 	{
 		//put value at address HL into A and decrement HL;
-		registers.a = dMEM[registers.hl];
+		registers.a = gb_read(registers.hl);
 		registers.hl--;
 		registers.pc++;
 		return 8;
@@ -607,7 +606,7 @@ uint8_t gbCPU::instruction(){
 	case 0x3E:      //LD A, n
 	{
 	  //load n into A
-		registers.a = dMEM[registers.pc + 1];
+		registers.a = gb_read(registers.pc + 1);
 		registers.pc++;//count past param
 		registers.pc++;
 		return 8;
@@ -669,7 +668,7 @@ uint8_t gbCPU::instruction(){
 	case 0x46:		//LD B, (HL)
 	{
 		//put value at address HL into register B
-		registers.b = dMEM[registers.hl];
+		registers.b = gb_read(registers.hl);
 		registers.pc++;
 		return 8;
 	}
@@ -725,7 +724,7 @@ uint8_t gbCPU::instruction(){
 	case 0x4E:		//LD C, (HL)
 	{
 		//put value at address HL into register C
-		registers.c = dMEM[registers.hl];
+		registers.c = gb_read(registers.hl);
 		registers.pc++;
 		return 8;
 	}
@@ -781,7 +780,7 @@ uint8_t gbCPU::instruction(){
 	case 0x56:		//LD D, (HL)
 	{
 		//put value at address HL into register D
-		registers.d = dMEM[registers.hl];
+		registers.d = gb_read(registers.hl);
 		registers.pc++;
 		return 8;
 	}
@@ -837,7 +836,7 @@ uint8_t gbCPU::instruction(){
 	case 0x5E:		//LD E, (HL)
 	{
 		//put value at address HL into register E
-		registers.e = dMEM[registers.hl];
+		registers.e = gb_read(registers.hl);
 		registers.pc++;
 		return 8;
 	}
@@ -893,7 +892,7 @@ uint8_t gbCPU::instruction(){
 	case 0x66:		//LD H, (HL)
 	{
 		//put value at address HL into register H
-		registers.h = dMEM[registers.hl];
+		registers.h = gb_read(registers.hl);
 		registers.pc++;
 		return 8;
 	}
@@ -949,7 +948,7 @@ uint8_t gbCPU::instruction(){
 	case 0x6E:		//LD L, (HL)
 	{
 		//put value at address HL into register L
-		registers.l = dMEM[registers.hl];
+		registers.l = gb_read(registers.hl);
 		registers.pc++;
 		return 8;
 	}
@@ -963,42 +962,42 @@ uint8_t gbCPU::instruction(){
 	case 0x70:		//LD (HL), B
 	{
 		//Put value of register B into memory at (HL)
-		MEM->write(registers.hl, registers.b);
+		gb_write(registers.hl, registers.b);
 		registers.pc++;
 		return 8;
 	}
 	case 0x71:		//LD (HL), C
 	{
 		//Put value of register C into memory at (HL)
-		MEM->write(registers.hl, registers.c);
+		gb_write(registers.hl, registers.c);
 		registers.pc++;
 		return 8;
 	}
 	case 0x72:		//LD (HL), D
 	{
 		//Put value of register D into memory at (HL)
-		MEM->write(registers.hl, registers.d);
+		gb_write(registers.hl, registers.d);
 		registers.pc++;
 		return 8;
 	}
 	case 0x73:		//LD (HL), E
 	{
 		//Put value of register E into memory at (HL)
-		MEM->write(registers.hl, registers.e);
+		gb_write(registers.hl, registers.e);
 		registers.pc++;
 		return 8;
 	}
 	case 0x74:		//LD (HL), H
 	{
 		//Put value of register H into memory at (HL)
-		MEM->write(registers.hl, registers.h);
+		gb_write(registers.hl, registers.h);
 		registers.pc++;
 		return 8;
 	}
 	case 0x75:		//LD (HL), L
 	{
 		//Put value of register L into memory at (HL)
-		MEM->write(registers.hl, registers.l);
+		gb_write(registers.hl, registers.l);
 		registers.pc++;
 		return 8;
 	}
@@ -1013,7 +1012,7 @@ uint8_t gbCPU::instruction(){
 	case 0x77:		//LD (HL), A
 	{
 		//Put register A into memory at address HL
-		MEM->write(registers.hl, registers.a);
+		gb_write(registers.hl, registers.a);
 		registers.pc++;
 		return 8;
 	}
@@ -1062,7 +1061,7 @@ uint8_t gbCPU::instruction(){
 	case 0x7E:		//LD A, (HL)
 	{
 		//Put value at address (HL) into register A
-		registers.a = dMEM[registers.hl];
+		registers.a = gb_read(registers.hl);
 		registers.pc++;
 		return 8;
 	}
@@ -1143,9 +1142,9 @@ uint8_t gbCPU::instruction(){
 	{
 		//Add data in (HL) to A
 		registers.f = 0x00;
-		setC(((int)dMEM[registers.hl] + (int)registers.a) > 255);
-		setH(((dMEM[registers.hl] & 0x0F) + (registers.a & 0x0F)) > 15);
-		registers.a += dMEM[registers.hl];
+		setC(((int)gb_read(registers.hl) + (int)registers.a) > 255);
+		setH(((gb_read(registers.hl) & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a += gb_read(registers.hl);
 		setZ(!registers.a);
 		registers.pc++;
 		return 8;
@@ -1231,9 +1230,9 @@ uint8_t gbCPU::instruction(){
 	{
 		bool c = ((registers.f & CMASK) >> 4);
 		registers.f = 0x00;
-		setC(((int)c + (int)registers.a + (int)dMEM[registers.hl]) > 255);
-		setH(((dMEM[registers.hl] & 0x0F) + (registers.a & 0x0F) + c) > 15);
-		registers.a += dMEM[registers.hl] + c;
+		setC(((int)c + (int)registers.a + (int)gb_read(registers.hl)) > 255);
+		setH(((gb_read(registers.hl) & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += gb_read(registers.hl) + c;
 		setZ(!registers.a);
 		registers.pc++;
 		return 8;
@@ -1319,9 +1318,9 @@ uint8_t gbCPU::instruction(){
 	{
 		//Subtract Data at HL from A
 		registers.f = NMASK;
-		setC(dMEM[registers.hl] > registers.a);
-		setH((dMEM[registers.hl] & 0x0F) > (registers.a & 0x0F));
-		registers.a -= dMEM[registers.hl];
+		setC(gb_read(registers.hl) > registers.a);
+		setH((gb_read(registers.hl) & 0x0F) > (registers.a & 0x0F));
+		registers.a -= gb_read(registers.hl);
 		setZ(!registers.a);
 		registers.pc++;
 		return 4;
@@ -1411,9 +1410,9 @@ uint8_t gbCPU::instruction(){
 		//Subtract data at HL + Cflag from A
 		bool c = (registers.f & CMASK);
 		registers.f = NMASK;
-		setC(((int)c + (int)dMEM[registers.hl]) > (int)registers.a);
-		setH(((registers.a & 0x0F) - (dMEM[registers.hl] & 0xf) - (c & 0x0F)) & 0x10);
-		registers.a -= dMEM[registers.hl] + c;
+		setC(((int)c + (int)gb_read(registers.hl)) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (gb_read(registers.hl) & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= gb_read(registers.hl) + c;
 		setZ(!registers.a);
 		registers.pc++;
 		return 4;
@@ -1487,7 +1486,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//Logically AND (HL) with A, place result in A
 		registers.f = HMASK;//reset N, set H, reset C
-		registers.a &= dMEM[registers.hl];
+		registers.a &= gb_read(registers.hl);
 		setZ(!registers.a);
 		registers.pc++;
 		return 8;
@@ -1558,7 +1557,7 @@ uint8_t gbCPU::instruction(){
 	case 0xAE:		//XOR (HL)
 	{
 		//logical XOR between A and (HL).
-		registers.a ^= dMEM[registers.hl];
+		registers.a ^= gb_read(registers.hl);
 		registers.f = 0x00;
 		setZ(!registers.a);
 		registers.pc++;
@@ -1629,7 +1628,7 @@ uint8_t gbCPU::instruction(){
 	case 0xB6:		//OR (HL)
 	{
 		//Logical OR data at HL with Register A, place result in A
-		registers.a |= dMEM[registers.hl];
+		registers.a |= gb_read(registers.hl);
 		registers.f = 0x00;
 		setZ(!registers.a);
 		registers.pc++;
@@ -1708,9 +1707,9 @@ uint8_t gbCPU::instruction(){
 	{
 		//compare data at (HL) to A
 		registers.f = NMASK;
-		setC(dMEM[registers.hl] > registers.a);
-		setH((dMEM[registers.hl] & 0x0F) > (registers.a & 0x0F));
-		setZ(registers.a == dMEM[registers.hl]);
+		setC(gb_read(registers.hl) > registers.a);
+		setH((gb_read(registers.hl) & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == gb_read(registers.hl));
 		registers.pc++;
 		return 8;
 	}
@@ -1744,7 +1743,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//jump to nn if Zflag is reset 
 		if (!(registers.f & ZMASK)) {
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 12;
 		}
 		else {
@@ -1757,7 +1756,7 @@ uint8_t gbCPU::instruction(){
 	case 0xC3:      //JP nn
 	{
 		//jump to address nn (lsByte first)
-		registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+		registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 		return 12;
 	}
 	case 0xC4:		//CALL NZ, nn
@@ -1766,7 +1765,7 @@ uint8_t gbCPU::instruction(){
 		if (!(registers.f & ZMASK)) {
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 24;
 		}
 		else {
@@ -1788,10 +1787,10 @@ uint8_t gbCPU::instruction(){
 	{
 		//Add n to A
 		registers.f = 0x00;
-		setC(((int)dMEM[registers.pc+1] + (int)registers.a) > 255);
-		setH(((dMEM[registers.pc + 1] & 0x0F) + (registers.a & 0x0F)) > 15);
+		setC(((int)gb_read(registers.pc+1) + (int)registers.a) > 255);
+		setH(((gb_read(registers.pc + 1) & 0x0F) + (registers.a & 0x0F)) > 15);
 		registers.pc++;
-		registers.a += dMEM[registers.pc];
+		registers.a += gb_read(registers.pc);
 		setZ(!registers.a);
 		registers.pc++; //jump past parameter
 		return 8;
@@ -1829,7 +1828,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//jump to nn if Zflag is set 
 		if (registers.f & ZMASK) {
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 12;
 		}
 		else {
@@ -1851,7 +1850,7 @@ uint8_t gbCPU::instruction(){
 		if (registers.f & ZMASK) {
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 24;
 		}
 		else {
@@ -1867,7 +1866,7 @@ uint8_t gbCPU::instruction(){
 		//push address of next instruction onto stack and then jump to address nn
 		PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 		PushStack((registers.pc + 3) & 0x00FF);
-		registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+		registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 		return 12;
 	}
 	case 0xCE:		//ADC A, n
@@ -1875,9 +1874,9 @@ uint8_t gbCPU::instruction(){
 		bool c = ((registers.f & 0b00010000) >> 4);
 		registers.f = 0x00;
 		registers.pc++;
-		setC(((int)c + (int)registers.a + (int)dMEM[registers.pc]) > 255);
-		setH(((dMEM[registers.pc] & 0x0F) + (registers.a & 0x0F) + c) > 15);
-		registers.a += dMEM[registers.pc] + c;
+		setC(((int)c + (int)registers.a + (int)gb_read(registers.pc)) > 255);
+		setH(((gb_read(registers.pc) & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += gb_read(registers.pc) + c;
 		setZ(!registers.a);
 		registers.pc++; //Increment past param
 		return 8;
@@ -1916,7 +1915,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//jump to nn if Cflag is reset 
 		if (!(registers.f & CMASK)) {
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 12;
 		}
 		else {
@@ -1937,7 +1936,7 @@ uint8_t gbCPU::instruction(){
 		if (!(registers.f & CMASK)) {
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 24;
 		}
 		else {
@@ -1960,9 +1959,9 @@ uint8_t gbCPU::instruction(){
 		//Subtract n from A
 		registers.f = NMASK;
 		registers.pc++;
-		setC(dMEM[registers.pc] > registers.a);
-		setH((dMEM[registers.pc] & 0x0F) > (registers.a & 0x0F));
-		registers.a -= dMEM[registers.pc];
+		setC(gb_read(registers.pc) > registers.a);
+		setH((gb_read(registers.pc) & 0x0F) > (registers.a & 0x0F));
+		registers.a -= gb_read(registers.pc);
 		setZ(!(registers.a));
 		registers.pc++;//Jump past param
 		return 8;
@@ -2001,7 +2000,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//jump to nn if Cflag is set 
 		if (registers.f & CMASK) {
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 12;
 		}
 		else {
@@ -2022,7 +2021,7 @@ uint8_t gbCPU::instruction(){
 		if (registers.f & CMASK) {
 			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
 			PushStack((registers.pc + 3) & 0x00FF);
-			registers.pc = (dMEM[registers.pc + 1] + (dMEM[registers.pc + 2] << 8));
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
 			return 24;
 		}
 		else {
@@ -2042,9 +2041,9 @@ uint8_t gbCPU::instruction(){
 		//Subtract n + Cflag from A
 		bool c = ((registers.f & CMASK) >> 4);
 		registers.f = NMASK;
-		setC(((int)c + (int)dMEM[registers.pc+1]) > (int)registers.a);
-		setH(((dMEM[registers.pc + 1] & 0x0F) + c) > (registers.a & 0x0F));
-		registers.a -= dMEM[registers.pc + 1] + c;
+		setC(((int)c + (int)gb_read(registers.pc+1)) > (int)registers.a);
+		setH(((gb_read(registers.pc + 1) & 0x0F) + c) > (registers.a & 0x0F));
+		registers.a -= gb_read(registers.pc + 1) + c;
 		setZ(!registers.a);
 		registers.pc++; // Increment past param
 		registers.pc++;
@@ -2064,7 +2063,7 @@ uint8_t gbCPU::instruction(){
 	case 0xE0:      //LDH (n), A
 	{
 	    //put A into memory address $FF00(IOports) + n
-		MEM->write(0xFF00 + dMEM[registers.pc + 1], registers.a);
+		gb_write(0xFF00 + gb_read(registers.pc + 1), registers.a);
 		registers.pc++;//increment past param
 		registers.pc++;
 		return 12;
@@ -2079,7 +2078,7 @@ uint8_t gbCPU::instruction(){
 	case 0xE2:		//LD (C), A
 	{
 		//put register A into address $FF00 + register C
-		MEM->write(0xFF00 + registers.c, registers.a);
+		gb_write(0xFF00 + registers.c, registers.a);
 		registers.pc++;
 		return 8;
 	}
@@ -2105,7 +2104,7 @@ uint8_t gbCPU::instruction(){
 		//Logically AND n with A, place result in A
 		registers.f = 0b00100000;//reset N, set H, reset C
 		registers.pc++;
-		registers.a &= dMEM[registers.pc];
+		registers.a &= gb_read(registers.pc);
 		setZ(!registers.a);
 		registers.pc++;
 		return 8;
@@ -2126,7 +2125,7 @@ uint8_t gbCPU::instruction(){
 		//Add n to SP
 		registers.f = 0x00;
 		registers.pc++;
-		signed char n = ((signed char)dMEM[registers.pc]);
+		signed char n = ((signed char)gb_read(registers.pc));
 		setC(((registers.sp & 0xFF) + (n & 0xFF)) & 0x100);
 		setH(((registers.sp & 0x0F) + (n & 0x0F)) & 0x10);
 		registers.sp = registers.sp + n;
@@ -2143,7 +2142,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//put A into (nn)
 		registers.pc++;
-		MEM->write(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8), registers.a);
+		gb_write(gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8), registers.a);
 		registers.pc++;//increment past params
 		registers.pc++;
 		return 16;
@@ -2166,7 +2165,7 @@ uint8_t gbCPU::instruction(){
 	case 0xEE:		//XOR n
 	{
 		//logical XOR between A and n.
-		registers.a ^= dMEM[registers.pc + 1];
+		registers.a ^= gb_read(registers.pc + 1);
 		registers.f = 0b00000000; //set zero flag
 		setZ(!registers.a);
 		registers.pc++;
@@ -2188,7 +2187,7 @@ uint8_t gbCPU::instruction(){
 	{
 	  //put memory address $FF00(IOports) + n into register A
 		registers.pc++;
-		registers.a = dMEM[0xFF00 + dMEM[registers.pc]];
+		registers.a = gb_read(0xFF00 + gb_read(registers.pc));
 		registers.pc++;//increment past param
 		return 12;
 	}
@@ -2206,7 +2205,7 @@ uint8_t gbCPU::instruction(){
 	case 0xF2:		//LD A, (C)
 	{
 		//put $FF00 + register C into register A
-		registers.a = dMEM[0xFF00 + registers.c];
+		registers.a = gb_read(0xFF00 + registers.c);
 		registers.pc++;
 		return 8;
 	}
@@ -2233,7 +2232,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//Logically OR n with A, place result in A
 		registers.f = 0b00000000;//reset N, set H, reset C
-		registers.a |= dMEM[registers.pc + 1];
+		registers.a |= gb_read(registers.pc + 1);
 		setZ(!registers.a);
 		registers.pc++; //jump past parameter
 		registers.pc++;
@@ -2255,7 +2254,7 @@ uint8_t gbCPU::instruction(){
 		//load SP + n(signed) into HL
 		registers.f = 0x00;
 		registers.pc++;
-		signed char n = ((signed char)dMEM[registers.pc]);
+		signed char n = ((signed char)gb_read(registers.pc));
 		setC(((registers.sp & 0xFF) + (n & 0xFF)) & 0x100);
 		setH(((registers.sp & 0x0F) + (n & 0x0F)) & 0x10);
 		registers.hl = registers.sp + n;
@@ -2272,7 +2271,7 @@ uint8_t gbCPU::instruction(){
 	{
 		//Load value at the address nn into A;
 		registers.pc++;
-		registers.a = dMEM[(dMEM[registers.pc] + (dMEM[registers.pc + 1] << 8))];
+		registers.a = gb_read((gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8)));
 		registers.pc++; //jump past params
 		registers.pc++;
 		return 16;
@@ -2300,9 +2299,9 @@ uint8_t gbCPU::instruction(){
 	  //like an A-n instruction but forget the result
 		registers.pc++;
 		registers.f = NMASK;
-		setC(dMEM[registers.pc] > registers.a);
-		setH((dMEM[registers.pc] & 0x0F) > (registers.a & 0x0F));
-		setZ(dMEM[registers.pc] == registers.a);
+		setC(gb_read(registers.pc) > registers.a);
+		setH((gb_read(registers.pc) & 0x0F) > (registers.a & 0x0F));
+		setZ(gb_read(registers.pc) == registers.a);
 		registers.pc++;//jump past parameter
 		return 8;
 	}
@@ -2326,7 +2325,7 @@ uint8_t gbCPU::instruction(){
 }
 
 uint8_t gbCPU::CBPrefix() {
-	switch (dMEM[registers.pc]) {
+	switch (gb_read(registers.pc)) {
 	case 0x00:		//RLC B
 	{
 		//Rotate B Left, old bit 7 into carry flag
@@ -2403,13 +2402,13 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Rotate Data at HL Left, old bit 7 into carry flag
 		registers.f = 0x00;
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		bool n = (hlData &0b10000000);
 		setC(n);
 		hlData <<= 1;
 		hlData += n;
 		setZ(!(hlData));
-		MEM->write(registers.hl, hlData);
+		gb_write(registers.hl, hlData);
 		registers.pc++;
 		return 8;
 	}
@@ -2501,13 +2500,13 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Rotate data in HL right, old bit 0 into carry flag
 		registers.f = 0x00;
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		bool n = (hlData & 0b00000001);
 		setC(n);
 		hlData >>= 1;
 		hlData += ((uint8_t)n) << 7;
 		setZ(!(hlData));
-		MEM->write(registers.hl, hlData);
+		gb_write(registers.hl, hlData);
 		registers.pc++;
 		return 8;
 	}
@@ -2600,12 +2599,12 @@ uint8_t gbCPU::CBPrefix() {
 		//Rotate Data at HL left through Carry Flag
 		bool n = (registers.f & CMASK);
 		registers.f = 0x00;
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		setC(hlData & 0x80);
 		hlData <<= 1;
 		hlData += n;
 		setZ(!hlData);
-		MEM->write(registers.hl, hlData);
+		gb_write(registers.hl, hlData);
 		registers.pc++;
 		return 8;
 	}
@@ -2698,12 +2697,12 @@ uint8_t gbCPU::CBPrefix() {
 		//Rotate data at HL right through Carry Flag
 		bool n = (registers.f & CMASK);
 		registers.f = 0x00;
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		setC(hlData & 0x01);
 		hlData >>= 1;
 		hlData += (((uint8_t)n) << 7);
 		setZ(!hlData);
-		MEM->write(registers.hl, hlData);
+		gb_write(registers.hl, hlData);
 		registers.pc++;
 		return 8;
 	}
@@ -2783,10 +2782,10 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Shift data at HL Left, into carry, LSB is 0;
 		registers.f = 0x00;
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		setC(hlData & 0x80);
 		hlData <<= 1;
-		MEM->write(registers.hl, hlData);
+		gb_write(registers.hl, hlData);
 		setZ(!hlData);
 		registers.pc++;
 		return 8;
@@ -2865,10 +2864,10 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Shift data at HL Right, into carry, MSB is Unchanged
 		registers.f = 0x00;
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		setC(hlData & 0x01);
 		hlData = ((hlData & 0xFE) >> 1) + (hlData & 0x80);
-		MEM->write(registers.hl, hlData);
+		gb_write(registers.hl, hlData);
 		setZ(!hlData);
 		registers.pc++;
 		return 8;
@@ -2940,9 +2939,9 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x36:		//SWAP (HL)
 	{
 		//Swap Upper and Lower Nibbles of A
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		registers.f = 0b00000000;
-		MEM->write(registers.hl, (hlData << 4) + (hlData >> 4));
+		gb_write(registers.hl, (hlData << 4) + (hlData >> 4));
 		setZ(!hlData);
 		registers.pc++;
 		return 16;
@@ -3020,10 +3019,10 @@ uint8_t gbCPU::CBPrefix() {
 	{
 		//Shift data at HL Right, into carry, MSB is 0;
 		registers.f = 0x00;
-		uint8_t hlData = dMEM[registers.hl];
+		uint8_t hlData = gb_read(registers.hl);
 		setC(hlData & 0x01);
 		hlData >>= 1;
-		MEM->write(registers.hl, hlData);
+		gb_write(registers.hl, hlData);
 		setZ(!hlData);
 		registers.pc++;
 		return 8;
@@ -3095,7 +3094,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x46:		//BIT 0, (HL)
 	{
 		//test bit 0 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b00000001));
+		setZ(!(gb_read(registers.hl) & 0b00000001));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3167,7 +3166,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x4E:		//BIT 1, (HL)
 	{
 		//test bit 1 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b00000010));
+		setZ(!(gb_read(registers.hl) & 0b00000010));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3239,7 +3238,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x56:		//BIT 2, (HL)
 	{
 		//test bit 2 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b00000100));
+		setZ(!(gb_read(registers.hl) & 0b00000100));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3311,7 +3310,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x5E:		//BIT 3, (HL)
 	{
 		//test bit 3 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b00001000));
+		setZ(!(gb_read(registers.hl) & 0b00001000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3383,7 +3382,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x66:		//BIT 4, (HL)
 	{
 		//test bit 4 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b00010000));
+		setZ(!(gb_read(registers.hl) & 0b00010000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3455,7 +3454,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x6E:		//BIT 5, (HL)
 	{
 		//test bit 5 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b00100000));
+		setZ(!(gb_read(registers.hl) & 0b00100000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3527,7 +3526,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x76:		//BIT 6, (HL)
 	{
 		//test bit 6 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b01000000));
+		setZ(!(gb_read(registers.hl) & 0b01000000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3599,7 +3598,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x7E:		//BIT 7, (HL)
 	{
 		//test bit 7 in data at address HL
-		setZ(!(dMEM[registers.hl] & 0b10000000));
+		setZ(!(gb_read(registers.hl) & 0b10000000));
 		setN(0);
 		setH(1);
 		registers.pc++;
@@ -3659,7 +3658,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x86:		//RES 0, (HL)
 	{
 		//reset bit 0 in register (HL)
-		MEM->andWrite(registers.hl, 0b11111110);
+		gb_andWrite(registers.hl, 0b11111110);
 		registers.pc++;
 		return 16;
 	}
@@ -3715,7 +3714,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x8E:		//RES 1, (HL)
 	{
 		//reset bit 1 in register (HL)
-		MEM->andWrite(registers.hl, 0b11111101);
+		gb_andWrite(registers.hl, 0b11111101);
 		registers.pc++;
 		return 16;
 	}
@@ -3771,7 +3770,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x96:		//RES 2, (HL)
 	{
 		//reset bit 2 in register (HL)
-		MEM->andWrite(registers.hl, 0b11111011);
+		gb_andWrite(registers.hl, 0b11111011);
 		registers.pc++;
 		return 16;
 	}
@@ -3827,7 +3826,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0x9E:		//RES 3, (HL)
 	{
 		//reset bit 3 in register (HL)
-		MEM->andWrite(registers.hl, 0b11110111);
+		gb_andWrite(registers.hl, 0b11110111);
 		registers.pc++;
 		return 16;
 	}
@@ -3883,7 +3882,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xA6:		//RES 4, (HL)
 	{
 		//reset bit 4 in register (HL)
-		MEM->andWrite(registers.hl, 0b11101111);
+		gb_andWrite(registers.hl, 0b11101111);
 		registers.pc++;
 		return 16;
 	}
@@ -3939,7 +3938,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xAE:		//RES 5, (HL)
 	{
 		//reset bit 5 in register (HL)
-		MEM->andWrite(registers.hl, 0b11011111);
+		gb_andWrite(registers.hl, 0b11011111);
 		registers.pc++;
 		return 16;
 	}
@@ -3995,7 +3994,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xB6:		//RES 6, (HL)
 	{
 		//reset bit 6 in register (HL)
-		MEM->andWrite(registers.hl, 0b10111111);
+		gb_andWrite(registers.hl, 0b10111111);
 		registers.pc++;
 		return 16;
 	}
@@ -4051,7 +4050,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xBE:		//RES 7, (HL)
 	{
 		//reset bit 7 in register (HL)
-		MEM->andWrite(registers.hl, 0b01111111);
+		gb_andWrite(registers.hl, 0b01111111);
 		registers.pc++;
 		return 16;
 	}
@@ -4107,7 +4106,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xC6:		//SET 0, (HL)
 	{
 		//set bit 0 in register (HL)
-		MEM->orWrite(registers.hl, 0b00000001);
+		gb_orWrite(registers.hl, 0b00000001);
 		registers.pc++;
 		return 16;
 	}
@@ -4163,7 +4162,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xCE:		//SET 1, (HL)
 	{
 		//set bit 1 in register (HL)
-		MEM->orWrite(registers.hl, 0b00000010);
+		gb_orWrite(registers.hl, 0b00000010);
 		registers.pc++;
 		return 16;
 	}
@@ -4219,7 +4218,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xD6:		//SET 2, (HL)
 	{
 		//set bit 2 in register (HL)
-		MEM->orWrite(registers.hl, 0b00000100);
+		gb_orWrite(registers.hl, 0b00000100);
 		registers.pc++;
 		return 16;
 	}
@@ -4275,7 +4274,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xDE:		//SET 3, (HL)
 	{
 		//set bit 3 in register (HL)
-		MEM->orWrite(registers.hl, 0b00001000);
+		gb_orWrite(registers.hl, 0b00001000);
 		registers.pc++;
 		return 16;
 	}
@@ -4331,7 +4330,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xE6:		//SET 4, (HL)
 	{
 		//set bit 4 in register (HL)
-		MEM->orWrite(registers.hl, 0b00010000);
+		gb_orWrite(registers.hl, 0b00010000);
 		registers.pc++;
 		return 16;
 	}
@@ -4387,7 +4386,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xEE:		//SET 5, (HL)
 	{
 		//set bit 5 in register (HL)
-		MEM->orWrite(registers.hl, 0b00100000);
+		gb_orWrite(registers.hl, 0b00100000);
 		registers.pc++;
 		return 16;
 	}
@@ -4443,7 +4442,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xF6:		//SET 6, (HL)
 	{
 		//set bit 6 in register (HL)
-		MEM->orWrite(registers.hl, 0b01000000);
+		gb_orWrite(registers.hl, 0b01000000);
 		registers.pc++;
 		return 16;
 	}
@@ -4499,7 +4498,7 @@ uint8_t gbCPU::CBPrefix() {
 	case 0xFE:		//SET 7, (HL)
 	{
 		//set bit 7 in register (HL)
-		MEM->orWrite(registers.hl, 0b10000000);
+		gb_orWrite(registers.hl, 0b10000000);
 		registers.pc++;
 		return 16;
 	}
@@ -4520,10 +4519,10 @@ uint8_t gbCPU::CBPrefix() {
 
 void gbCPU::timers(uint8_t clock) {
 	static uint32_t clkCount = 0;
-	if (dMEM[0xFF07] & 0b00000100) {
+	if (gb_read(0xFF07) & 0b00000100) {
 		clkCount += clock;
 		uint32_t cycles = 0;
-		switch (dMEM[0xFF07] & 0b00000011)
+		switch (gb_read(0xFF07) & 0b00000011)
 		{
 		case 0:
 			cycles = 1024;
@@ -4539,11 +4538,11 @@ void gbCPU::timers(uint8_t clock) {
 			break;
 		}
 		if(clkCount >= cycles) {
-			dMEM[0xFF05]++;
-			if (dMEM[0xFF05] == 0) {
+			gb_inc(0xFF05);
+			if (gb_read(0xFF05) == 0) {
 				//overflow, reset, and request interrupt
-				dMEM[0xFF05] = dMEM[0xFF06]; 
-				dMEM[0xFF0F] |= 0b00000100;
+				gb_write(0xFF05, gb_read(0xFF06)); 
+				gb_orWrite(0xFF0F, 0b00000100);
 			}
 			clkCount -= cycles;
 		}
@@ -4554,29 +4553,26 @@ int gbCPU::interrupts(int cycles) {
 	int IntCycles = 0; 
 
 	//OAM DMA Transfer
-	if (DMA != dMEM[0xFF46]) {
-		DMA = dMEM[0xFF46];
-		std::memcpy(dMEM + 0xFE00, dMEM + (DMA << 8), 0x9F);
-		// for (uint8_t byte = 0x00; byte < 0x9F; byte++) {
-		// 	dMEM[0xFE00 + byte] = dMEM[(DMA << 8) + byte];
-		// }
-		dMEM[0xFF46] = 0xE1;
+	if (DMA != gb_read(0xFF46)) {
+		DMA = gb_read(0xFF46);
+		gb_DMA(DMA);
+		gb_write(0xFF46, 0xE1);
 		DMA = 0xE1;
 	}
 
 	//DIV Register counting
-	if (dMEM[0xFF04] != DIV) {
+	if (gb_read(0xFF04) != DIV) {
 		DIV = 0x00;
-		dMEM[0xFF04] = 0x00;
+		gb_write(0xFF04, 0x00);
 	} else {
 		DIV+=cycles-1;
-		dMEM[0xFF04]+=cycles-1;
+		gb_write(0xFF04, gb_read(0xFF04)+cycles-1);
 	}
 
 	// Interrupts
 	if (IME) {
-		if		(dMEM[0xFFFF] & 0b00000001 && dMEM[0xFF0F] & 0b00000001) {//Vblank
-			dMEM[0xFF0F] &= 0b11111110;
+		if		(gb_read(0xFFFF) & 0b00000001 && gb_read(0xFF0F) & 0b00000001) {//Vblank
+			gb_andWrite(0xFF0F, 0b11111110);
 			preIME = false;
 			halted = false;
 			IntCycles += 20;
@@ -4585,8 +4581,8 @@ int gbCPU::interrupts(int cycles) {
 			registers.pc = 0x0040;
 			// printf("Vblank interrupt taken\n");
 		}
-		else if (dMEM[0xFFFF] & 0b00000010 && dMEM[0xFF0F] & 0b00000010) {//LCD STAT
-			dMEM[0xFF0F] &= 0b11111101;
+		else if (gb_read(0xFFFF) & 0b00000010 && gb_read(0xFF0F) & 0b00000010) {//LCD STAT
+			gb_andWrite(0xFF0F, 0b11111101);
 			preIME = false;
 			halted = false; 
 			IntCycles += 20;
@@ -4595,8 +4591,8 @@ int gbCPU::interrupts(int cycles) {
 			registers.pc = 0x0048;
 			// printf("STAT interrupt taken\n");
 		}
-		else if (dMEM[0xFFFF] & 0b00000100 && dMEM[0xFF0F] & 0b00000100) {//Timer
-			dMEM[0xFF0F] &= 0b11111011;
+		else if (gb_read(0xFFFF) & 0b00000100 && gb_read(0xFF0F) & 0b00000100) {//Timer
+			gb_andWrite(0xFF0F, 0b11111011);
 			preIME = false;
 			halted = false;
 			IntCycles += 20;
@@ -4605,31 +4601,31 @@ int gbCPU::interrupts(int cycles) {
 			registers.pc = 0x0050;
 			// printf("TIMER interrupt taken\n");
 		}
-		else if (dMEM[0xFFFF] & 0b00001000 && dMEM[0xFF0F] & 0b00001000) {//Serial
+		else if (gb_read(0xFFFF) & 0b00001000 && gb_read(0xFF0F) & 0b00001000) {//Serial
 			Failure(4);
 			//yeah. actually. skip this. not for my emulator yet
 		}
-		else if (dMEM[0xFFFF] & 0b00010000 && dMEM[0xFF0F] & 0b00010000) {//Joypad
+		else if (gb_read(0xFFFF) & 0b00010000 && gb_read(0xFF0F) & 0b00010000) {//Joypad
 			Failure(4);
 		}
 	}
 	else if (halted) {
-		if (dMEM[0xFFFF] & 0b00000001 && dMEM[0xFF0F] & 0b00000001) {//Vblank
+		if (gb_read(0xFFFF) & 0b00000001 && gb_read(0xFF0F) & 0b00000001) {//Vblank
 			halted = false;
 			IntCycles += 32;
 		}
-		else if (dMEM[0xFFFF] & 0b00000010 && dMEM[0xFF0F] & 0b00000010) {//LCD STAT
+		else if (gb_read(0xFFFF) & 0b00000010 && gb_read(0xFF0F) & 0b00000010) {//LCD STAT
 			halted = false;
 			IntCycles += 32;
 		}
-		else if (dMEM[0xFFFF] & 0b00000100 && dMEM[0xFF0F] & 0b00000100) {//Timer
+		else if (gb_read(0xFFFF) & 0b00000100 && gb_read(0xFF0F) & 0b00000100) {//Timer
 			halted = false;
 			IntCycles += 32;
 		}
-		else if (dMEM[0xFFFF] & 0b00001000 && dMEM[0xFF0F] & 0b00001000) {//Serial
+		else if (gb_read(0xFFFF) & 0b00001000 && gb_read(0xFF0F) & 0b00001000) {//Serial
 			Failure(4);
 		}
-		else if (dMEM[0xFFFF] & 0b00010000 && dMEM[0xFF0F] & 0b00010000) {//Joypad
+		else if (gb_read(0xFFFF) & 0b00010000 && gb_read(0xFF0F) & 0b00010000) {//Joypad
 			Failure(4);
 		}
 	}
@@ -4637,7 +4633,7 @@ int gbCPU::interrupts(int cycles) {
 	if (preIME != IME) {
 		IME = preIME;
 		if (IME) {
-			dMEM[0xFF0F] &= 0b11100000;
+			gb_andWrite(0xFF0F, 0b11100000);
 		}
 	}
 	
@@ -4650,7 +4646,7 @@ void gbCPU::setColor()
 	registers.a = 0x11;
 	registers.b = 0x00;
 	setZ(1);
-	dMEM[0xFF46] = 0x00;
+	gb_write(0xFF46, 0x00);
 	DMA = 0x00;
 }
 
@@ -4670,11 +4666,11 @@ void gbCPU::initCpu() {
 
 inline void gbCPU::PushStack(uint8_t data) {
     registers.sp--;
-    dMEM[registers.sp] = data;
+    gb_write(registers.sp, data);
 }
 
 inline uint8_t gbCPU::PopStack() {
-    uint8_t data = dMEM[registers.sp];
+    uint8_t data = gb_read(registers.sp);
     registers.sp++;
     return data;
 }
@@ -4715,39 +4711,22 @@ inline void gbCPU::setC(bool set) {
     }
 }
 
-void gbCPU::Failure(int code) {switch (code) {
+void gbCPU::Failure(int code) {
+	switch (code) {
 	case 0:
-		std::cout << "Failed Instruction! Code: 0x";
-		printf("%.2X", dMEM[registers.pc]);
-		printf("\n");
-		std::cout << ("PC: 0x");
-		printf("%.4X", registers.pc);
-		printf("\n");
+		printf("Failed Instruction! Code: 0x%.2X\n \tPC: 0x%.4X\n", gb_read(registers.pc), registers.pc);
 		break;
 	case 1:
-		std::cout << "Hit invalid Opcode!" << std::endl;
-		std::cout << ("PC: 0x");
-		std::cout << std::hex << registers.pc << std::endl << "Code: 0x";
-		std::cout << std::hex << (int)dMEM[registers.pc] << std::endl;
-		registers.pc++;
+		printf("Hit invalid Opcode! Code: 0x%.2X\n \tPC: 0x%.4X\n", gb_read(registers.pc), registers.pc);
 		break;
 	case 2:
-		std::cout << "Failed CB Instruction! Code: 0xCB 0x";
-		printf("%.2X", dMEM[registers.pc]);
-		printf("\n");
-		std::cout << ("PC: 0x");
-		printf("%.4X", registers.pc-1);
-		printf("\n");
+		printf("Failed CB Instruction! Code: 0xCB 0x%.2X\n", gb_read(registers.pc));
 		break;
 	case 3:
-		std::cout << "HALT!" << std::endl;
-		std::cout << ("PC: 0x");
-		std::cout << std::hex << registers.pc << std::endl;
+		printf("HALT! \t PC: 0x%.2X\n", registers.pc);
 		break;
 	case 4:
-		std::cout << "Failed to fulfill requested Interrupt" << std::endl;
-		std::cout << ("PC: 0x");
-		std::cout << std::hex << registers.pc << std::endl;
+		printf("Interrupt Err \t PC: 0x%.2X\n", registers.pc);
 		break;
     default:
         printf("unknown error\n");
@@ -4760,15 +4739,15 @@ void gbCPU::printInstruction()
 	static bool print = 0;
 
 	if(print){
-	    printf("x%04X-x%02X | x%04X\n",registers.pc, dMEM[registers.pc], registers.af);
+	    printf("x%04X-x%02X | x%04X\n",registers.pc, gb_read(registers.pc), registers.af);
 	}
 	
 	// if(registers.pc == 0x294f){print = false;}
 
-	if(MEM->flag){
-		printf("PC - %X \n", registers.pc);
-		MEM->flag = 0;
-	}
+	// if(MEM->flag){
+	// 	printf("PC - %X \n", registers.pc);
+	// 	MEM->flag = 0;
+	// }
 
 	#ifdef LOGFILE
 	static bool writing = 1;
@@ -4777,7 +4756,7 @@ void gbCPU::printInstruction()
 		writing = 1;
 	}
 	if(writing){
-		myfile << std::hex << registers.pc << "-" << std::hex << (int)dMEM[registers.pc];
+		myfile << std::hex << registers.pc << "-" << std::hex << (int)gb_read(registers.pc);
 		myfile << " | AF-" << std::hex << registers.af << " BC-" << std::hex << registers.bc << " DE-" << std::hex << registers.de << " HL-" << std::hex << registers.hl;
 		myfile << std::endl;
 	}
@@ -4786,5 +4765,5 @@ void gbCPU::printInstruction()
 	}
 	#endif
 
-	// printf("%X\n", dMEM[0xFF80]);
+	// printf("%X\n", gb_read(0xFF80));
 }

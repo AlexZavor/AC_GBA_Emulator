@@ -8,7 +8,6 @@
 #include "timer.h"
 
 static SDL_Renderer* renderer;
-static gbMEM* MEM;
 static gbCPU* CPU;
 static gbPPU* PPU; 
 static inputData input;
@@ -31,14 +30,14 @@ void gbEmulator_init(SDL_Renderer* render, SDL_Event* event) {
 	resetInputData(&input);
     e = event;
     // init mem, cpu, and ppu
-    MEM = new gbMEM();
-    CPU = new gbCPU(MEM);
-    PPU = new gbPPU(MEM, renderer);
+    gbMEM_init();
+    CPU = new gbCPU();
+    PPU = new gbPPU(renderer);
     // gbAPU().APU_setMEM(MEM);
 }
 
 void gbEmulator_deinit(){
-    delete(MEM);
+    gbMEM_deinit();
     delete(CPU);
     delete(PPU);
 }
@@ -53,19 +52,19 @@ int gbEmulator_run() {
     {
         static int cycle_count = 0; 
         cycle_count += 456;
-        MEM->MEM[0xFF44] = line;
+        gb_write(0xFF44, line);
         while (cycle_count > 0)
         {   
             //Update joypad
-            switch (MEM->MEM[0xFF00] & 0x30) {
+            switch (gb_read(0xFF00) & 0x30) {
             case 0x10:
-                MEM->MEM[0xFF00] = inputButtons;
+                gb_write(0xFF00, inputButtons);
                 break;
             case 0x20:
-                MEM->MEM[0xFF00] = inputDpad;
+                gb_write(0xFF00, inputDpad);
                 break;
             default:
-                MEM->MEM[0xFF00] = 0x3F;
+                gb_write(0xFF00, 0x3F);
                 break;
             }
             // Run CPU until finish line
@@ -88,7 +87,7 @@ int gbEmulator_run() {
 }
 
 int gbEmulator_insertCart(game* game) {
-    if(MEM->insertCart(game)) {
+    if(gbMEM_insertCart(game)) {
         return true;
     }
     else {

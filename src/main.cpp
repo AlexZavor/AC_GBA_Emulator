@@ -3,6 +3,7 @@
 #include "SDL.h"
 #include "SDL_ttf.h"
 #include "menu/menu.h"
+#include "stdbool.h"
 
 /*
 Menu
@@ -11,6 +12,7 @@ GB
 	PPU
 	    sprite priority?
 	    flickering?
+		parallax bug still
 	MEM
 	CPU
 GBC

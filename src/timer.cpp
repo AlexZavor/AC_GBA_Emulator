@@ -9,7 +9,7 @@
 #endif
 
 #ifdef FPS_COUNT
-    #define AVG_BUFFER_SIZE 60
+    #define AVG_BUFFER_SIZE 600
 	static float minTime = 999;
 	static float maxTime = 0;
     static float avg_buffer[AVG_BUFFER_SIZE];
@@ -47,7 +47,7 @@ void timer_buff(){
 void timer_print_data(){
     #ifdef FPS_COUNT
     float avgTime = 0;
-    for(auto i : avg_buffer){avgTime += i;}
+    for(int i =0; i<AVG_BUFFER_SIZE; i++){avgTime += avg_buffer[i];}
     avgTime /= AVG_BUFFER_SIZE;
     printf("___\n\tmin - %.3f\n\tmax - %.3f\n\tavg - %.3f\n~~~\n", minTime, maxTime, avgTime);
     minTime = 999;

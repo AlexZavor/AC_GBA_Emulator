@@ -9,15 +9,13 @@
 
 class gbPPU{
     private:
-        gbMEM* MEM;
-        uint8_t* dMEM;
         SDL_Renderer* renderer;
         SDL_Texture* texture;
 
         uint8_t Vram[160][144];
 
     public:
-        gbPPU(gbMEM* memory, SDL_Renderer* rend);
+        gbPPU(SDL_Renderer* rend);
         void drawLine();
         void updatePPU(int cycles);
 

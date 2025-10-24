@@ -11,8 +11,6 @@
 class gbcPPU{
 
     private:
-        gbMEM* MEM;
-        uint8_t* dMEM;
         SDL_Renderer* renderer;
         SDL_Texture* texture;
 
@@ -24,7 +22,7 @@ class gbcPPU{
         uint8_t lastDMA;
 
     public:
-        gbcPPU(gbMEM* memory, SDL_Renderer* rend);
+        gbcPPU(SDL_Renderer* rend);
         void drawLine();
         uint32_t updatePPU(int cycles);
 

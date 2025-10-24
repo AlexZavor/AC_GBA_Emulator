@@ -51,8 +51,6 @@ struct reg {
 
 class gbCPU{
     private:
-        gbMEM* MEM;
-        uint8_t* dMEM;
         //Main CPU Registers, A,B,C,D,E,F,H,L,sp,pc.
         //also addressable through common combinations like HL or AF
         struct reg registers;
@@ -66,7 +64,7 @@ class gbCPU{
         int lineprogress;
 
     public:
-        gbCPU(gbMEM* memory);
+        gbCPU();
         //Returns number of cycles taken to execute
         uint8_t instruction();
         void printInstruction();

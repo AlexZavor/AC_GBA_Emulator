@@ -1,7 +1,10 @@
 #include "gb/gbMEM.h"
 
+#include <sys/stat.h> //For creating save folder
+#include <fstream>
 #include "globals.h"
-#include <sys/stat.h> //For creating folder
+#include "stdio.h"
+#include "string.h"
 
 /*
 Interrupt Enable Register
@@ -24,282 +27,53 @@ Echo of 8kB Internal RAM
 --------------------------- A000
 8kB Video RAM
 --------------------------- 8000 --
-16kB switchable ROM bank |
+16kB switchable ROM bank 		   |
 --------------------------- 4000   |= 32kB Cartridge
-16kB ROM bank #0 |
+16kB ROM bank #0 				   |
 --------------------------- 0000 --
 */
 
-gbMEM::gbMEM() {
-    initMem();
-	memset(BGColorPallet,0xFF, sizeof(BGColorPallet));
-	memset(OBJColorPallet,0xFF, sizeof(OBJColorPallet));
-	memset(Vram, 0x00, sizeof(Vram));
-	color = false;
-}
+// ----------- cartridge data -----------
+game* game_p;
+typedef enum{
+	NONE,
+	MBC1,
+	MBC2,
+	MBC3,
+	MBC5,
+}MBC;
+MBC cartMBC;
+uint16_t bank;
+uint16_t banks;
+uint8_t ramBank;
+uint8_t ramBanks;
+bool RAMEnabled;
+bool battery;
+bool RAM;
+bool timer;
+bool rumble;
 
-gbMEM::~gbMEM()
-{
-	saveRam();
-}
+// System Memory
+uint8_t MEM[0x10000];
 
-void gbMEM::write(uint16_t address, uint8_t data){
-	if (address < 0x8000) {
-		// Writing to cartage. probably a register
-		// std::cout << "cartage write" << std::endl;
-		switch (cartMBC) {
-		case MBC::NONE:
-			//std::cout << "probably Tetris being annoying" << std::endl;
-			break;
-		case MBC::MBC1:
-			if (address < 0x2000) {
-				//Ram Enable
-				if ((data & 0x0F) == 0x0A) {
-					RAMEnabled = true;
-				}
-				else {
-					RAMEnabled = false;
-				}
-			}
-			else if (address < 0x4000) {
-				//ROM Bank Number
-				bank = data & 0x1F;
-				if (bank == 0) {
-					bank = 1;
-				}if (banks < 16) {
-					bank &= 0b00001111;
-				}if (banks < 8) {
-					bank &= 0b00000111;
-				}if (banks < 4) {
-					bank &= 0b00000011;
-				}
-				// printf("Bank swap - %d\n", bank);
-				memcpy(MEM + 0x4000, cartage + ((long)bank * (long)0x4000), 0x4000);
-			}
-			else if (address < 0x6000) {
-				//RAM Bank Number / upper bits
-				if(ramBanks > 1){
-					printf("Swap ram bank - MBC1\n");
-					// Save old ram
-					memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
-					// Load new data
-					ramBank = data;
-					if (ramBank > ramBanks) {
-						ramBank = 0;
-					}
-					memcpy(MEM + 0xA000, ram + (ramBank * 0x2000), 0x2000);
-				}
-				if(banks >= 64){
-					printf("ERROR: upper bits change - MBC1\n");
-				}
-			}
-			else if (address < 0x8000) {
-				//Banking Mode Select
-				printf("ERROR: Banking Mode Select - MBC1\n");
-			}
-			break;
-		case MBC::MBC5:
-			if (address < 0x2000) {
-				//Ram Enable
-				if ((data & 0x0F) == 0x0A) {
-					RAMEnabled = true;
-				}
-				else {
-					RAMEnabled = false;
-				}
-			}
-			else if (address < 0x3000) {
-				//ROM Bank Number
-				bank &= 0xFF00;
-				bank += data;
-				bank %= banks;
-				// printf("Swap rom bank - MBC5 %d\n", bank);
-				std::memcpy(MEM + 0x4000, cartage + ((long)bank * (long)0x4000), 0x4000);
-			}
-			else if (address < 0x4000) {
-				//ROM Bank Number high bit
-				bank &= 0x00FF;
-				bank |= ((uint16_t)(data))<<8;
-				std::memcpy(MEM + 0x4000, cartage + ((long)bank * (long)0x4000), 0x4000);
-			}
-			else if (address < 0x6000) {
-				//RAM Bank Number
-				// printf("Swap ram bank - MBC5\n");
-				// Save old ram
-				memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
-				// Load new data
-				ramBank = data;
-				memcpy(MEM + 0xA000, ram + (ramBank * 0x2000), 0x2000);
-			}
-			else if (address < 0x8000) {
-				printf("ERROR: Nothing here - MBC5\n");
-			}
-			break;
-		default:
-			break;
-		}
-		return;
-	}
-	else if(address == 0xFF55){
-		// GBC dma transfer
-		if(data & 0x80){
-			// H-blank DMA
-			printf("H-blank dma\n");
-			MEM[0xFF55] = 0xFF;
-		} else {
-			// Instant DMA
-			// printf("more DMA\n");
-			uint16_t size = ((data & 0x7f) + 1);
-			vRamDMAFull(size * 0x10);
-			// time += size;
-			MEM[0xFF55] = 0xFF;
-		}
-		// MEM[address] = data;
-	}
-	else if(address == 0xFF69){
-		// BG color pallets
-		MEM[address] = data;
-        pallet* pal = BGColorPallet + ((MEM[0xFF68] & 0x38) >> 3);
-        switch (MEM[0xFF68] & 0x07) {
-        case 0:
-            pal->low0 = MEM[0xFF69];
-            break;
-        case 1:
-            pal->high0 = MEM[0xFF69];
-            break;
-        case 2:
-            pal->low1 = MEM[0xFF69];
-            break;
-        case 3:
-            pal->high1 = MEM[0xFF69];
-            break;
-        case 4:
-            pal->low2 = MEM[0xFF69];
-            break;
-        case 5:
-            pal->high2 = MEM[0xFF69];
-            break;
-        case 6:
-            pal->low3 = MEM[0xFF69];
-            break;
-        case 7:
-            pal->high3 = MEM[0xFF69];
-            break;
-        }
-        if(MEM[0xFF68] & 0x80){
-            MEM[0xFF68]++;
-            MEM[0xFF68] &= 0b10111111;
-        }
-	}
-	else if(address == 0xFF6B){
-		// OBJ color pallets
-		MEM[address] = data;
-        pallet* pal = OBJColorPallet + ((MEM[0xFF6A] & 0x38) >> 3);
-        switch (MEM[0xFF6A] & 0x07)
-        {
-        case 0:
-            pal->low0 = MEM[0xFF6B];
-            break;
-        case 1:
-            pal->high0 = MEM[0xFF6B];
-            break;
-        case 2:
-            pal->low1 = MEM[0xFF6B];
-            break;
-        case 3:
-            pal->high1 = MEM[0xFF6B];
-            break;
-        case 4:
-            pal->low2 = MEM[0xFF6B];
-            break;
-        case 5:
-            pal->high2 = MEM[0xFF6B];
-            break;
-        case 6:
-            pal->low3 = MEM[0xFF6B];
-            break;
-        case 7:
-            pal->high3 = MEM[0xFF6B];
-            break;
-        }
-        if(MEM[0xFF6A] & 0x80){
-            MEM[0xFF6A]++;
-            MEM[0xFF6A] &= 0b10111111;
-        }
-	}
-	else if(address == 0xFF4F){
-		// Vram check
-		MEM[address] = (data | 0xE);
-		swapVramBank(data);
-	}
-	else if(address == 0xFF70){
-		// Wram check
-		MEM[address] = data;
-		swapWramBank(data);
-	}
-	else{
-		MEM[address] = data;
-	}
-}
-void gbMEM::orWrite(uint16_t address, uint8_t data){
-	write(address, MEM[address] | data);
-}
-void gbMEM::andWrite(uint16_t address, uint8_t data){
-	write(address, MEM[address] & data);
-}
+uint8_t Vram[0x4000];
+uint8_t VramBank = 1;
 
-void gbMEM::setColor() {
-	color = true;
-	MEM[0xFF4C] = 0xC0;
-	MEM[0xFF4D] = 0xfe;
-	MEM[0xFF4F] = 0xfe;
-	MEM[0xFF51] = 0xff;
-	MEM[0xFF52] = 0xff;
-	MEM[0xFF53] = 0xff;
-	MEM[0xFF54] = 0xff;
-	MEM[0xFF55] = 0xff;
-	MEM[0xFF56] = 0x3e;
-	MEM[0xFF6C] = 0x00;
-	MEM[0xFF70] = 0xf8;
-}
+char* cartridge;
+char* ram;
 
-bool gbMEM::insertCart(game* g){
-	std::streampos size;
-	std::ifstream file2(GAME_DIR + g->name, std::ios::in | std::ios::binary | std::ios::ate);
-	if (file2.is_open())
-	{
-		size = file2.tellg();
-		cartage = new char[(int)size];
-		game_p = g;
-		file2.seekg(0, std::ios::beg);
-		file2.read(cartage, size);
-		file2.close();
-		memcpy(MEM, cartage, 0x8000);
-		if (!setMBC(MEM[0x0147])) {
-			std::cout << "\n Unrecognized MBC - ";
-			printf("%.2X\n", MEM[0x0147]);
-			return false;
-		}
-		else {
-			setBanks(MEM[0x0148]);
-			setRam(MEM[0x0149]);
-		}
-	}
-	else {
-		printf("\n Unable to load cartage!\n");
-		return false;
-	}
-    
-    //Print out Title of Game cartage! EPIC!
-    printf("\n loaded cartage - ");
-    for (int i = 0x134; i < 0x142; i++) {
-        std::cout << ((char)MEM[i]);
-    }
-    printf("\n");
-	return true;
-}
+// GBC variables
+bool color = false;
+pallet BGColorPallet[8];
+pallet OBJColorPallet[8];
+uint8_t Wram[0x8000];
+uint8_t WramBank = 1;
 
-void gbMEM::initMem() {
+
+
+// ============== Helper functions ==============
+// sets inital values in the memory and for the cartridge
+void initMem() {
 	WramBank = 1;
 	cartMBC = MBC::NONE;
 	RAMEnabled = false;
@@ -312,41 +86,19 @@ void gbMEM::initMem() {
 	timer = false;
 	rumble = false;
 
-    MEM[0xFF01] = 0x00;
 	MEM[0xFF02] = 0x7E;
-	MEM[0xFF04] = 0x00;
-	MEM[0xFF05] = 0x00;
-	MEM[0xFF06] = 0x00;
 	MEM[0xFF07] = 0xF8;
-	MEM[0xFF0F] = 0x00;
 	MEM[0xFF10] = 0x80;
-	MEM[0xFF11] = 0x00;
-	MEM[0xFF12] = 0x00;
-	MEM[0xFF13] = 0x00;
-	MEM[0xFF14] = 0x00;
-	MEM[0xFF16] = 0x00;
-	MEM[0xFF17] = 0x00;
-	MEM[0xFF18] = 0x00;
-	MEM[0xFF19] = 0x00;
-	MEM[0xFF1A] = 0x00;
-	MEM[0xFF1B] = 0x00;
-	MEM[0xFF1C] = 0x00;
-	MEM[0xFF1E] = 0x00;
-	MEM[0xFF20] = 0x00;
-	MEM[0xFF23] = 0x00;
-	MEM[0xFF24] = 0x00;
-	MEM[0xFF25] = 0x00;
 	MEM[0xFF26] = 0x0F;
 	MEM[0xFF40] = 0x91;
 	MEM[0xFF41] = 0x81;
-	MEM[0xFF44] = 0x00;
 	MEM[0xFF46] = 0xFF;
 	MEM[0xFF47] = 0xFC;
 	MEM[0xFF48] = 0xFF;
 	MEM[0xFF49] = 0xFF;
 }
 
-bool gbMEM::setMBC(uint8_t code) {
+bool setMBC(uint8_t code) {
 	switch (code)
 	{
 	// No MBC
@@ -432,13 +184,13 @@ bool gbMEM::setMBC(uint8_t code) {
 	}
 }
 
-bool gbMEM::setBanks(uint8_t code) {
+bool setBanks(uint8_t code) {
 	banks = 0x0002;
 	banks <<= (code);
 	return true;
 }
 
-bool gbMEM::setRam(uint8_t code) {
+bool setRam(uint8_t code) {
 	switch (code)
 	{
 	case 0x00:
@@ -461,26 +213,26 @@ bool gbMEM::setRam(uint8_t code) {
 	}
 	ram = new char[(int)ramBanks * 0x2000];
 	if (ramBanks && battery) {
-		std::cout << "loading save - ";
+		printf("Loading save file - ");
 		std::ifstream file(SAVE_DIR + (game_p->name) + ".SAV", std::ios::in | std::ios::binary | std::ios::ate);
 		if (file.is_open())
 		{
 			file.seekg(0, std::ios::beg);
 			file.read(ram, (int)ramBanks * 0x2000);
 			file.close();
-			memcpy(MEM + 0xA000, ram + (ramBank*0x2000), 0x2000);
-			std::cout << "save loaded" << std::endl;
+			// memcpy(MEM + 0xA000, ram + (ramBank*0x2000), 0x2000);
+			printf("save loaded!\n");
 		}
 		else {
-			std::cout << "Save not found" << std::endl;
+			printf("Save failed to load.\n");
 		}
 	}
 	return true;
 }
 
-bool gbMEM::saveRam() {
+bool saveRam() {
 	if (ramBanks > 0 && battery) {
-		memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
+		// memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
 		mkdir(SAVE_DIR, 0777);
 		std::ofstream file(SAVE_DIR + (game_p->name) + ".SAV");
 		file.open(SAVE_DIR + (game_p->name) + ".SAV", std::ios::out | std::ios::binary);
@@ -489,20 +241,287 @@ bool gbMEM::saveRam() {
 			file.clear();
 			file.write((char*)ram, (int)ramBanks * 0x2000);
 			file.close();
-			std::cout << "Saved game \n";
+			printf("Game Saved\n");
 			game_p->has_save = true;
 			return 1;
 		}
 		else {
 			game_p->has_save = false;
-			std::cout << "failed to save \n";
+			printf("Game could not save\n");
 			return 0;
 		}
 	}
 	return 1;
 }
 
-bool gbMEM::swapWramBank(uint8_t bank)
+// ============== GB MEM functions ===============
+
+void gbMEM_init() {
+	initMem();
+	memset(BGColorPallet,0xFF, sizeof(BGColorPallet));
+	memset(OBJColorPallet,0xFF, sizeof(OBJColorPallet));
+	memset(Vram, 0x00, sizeof(Vram));
+	color = false;
+}
+
+void gbMEM_deinit()
+{
+	saveRam();
+	memset(MEM, 0, 0x10000); // unload the cartridge and memory
+	game_p = NULL;
+}
+
+int gbMEM_insertCart(game* g){
+	// TODO: MMap?
+	std::streampos size;
+	std::ifstream file2(GAME_DIR + g->name, std::ios::in | std::ios::binary | std::ios::ate);
+	if (file2.is_open())
+	{
+		size = file2.tellg();
+		cartridge = new char[(int)size];
+		game_p = g;
+		file2.seekg(0, std::ios::beg);
+		file2.read(cartridge, size);
+		file2.close();
+		memcpy(MEM, cartridge, 0x8000);
+		if (!setMBC(MEM[0x0147])) {
+			printf("\nUnrecognized MBC - %.2X\n", MEM[0x0147]);
+			return false;
+		}
+		else {
+			setBanks(MEM[0x0148]);
+			setRam(MEM[0x0149]);
+		}
+	}
+	else {
+		printf("Unable to load cartridge!\n");
+		return false;
+	}
+	
+	//Print out Title of Game cartridge! EPIC!
+	char title[15];
+	memcpy(title, &MEM[0x134], 14);
+	printf("Loaded Cartridge - %s\n", title);
+	return true;
+}
+
+void gbMEM_colorWriteChecks(uint16_t address, uint8_t data){
+	MEM[address] = data;
+	if(address == 0xFF55){
+		// GBC dma transfer
+		if(data & 0x80){
+			// H-blank DMA
+			printf("H-blank dma\n");
+			MEM[0xFF55] = 0xFF;
+		} else {
+			// Instant DMA
+			// printf("more DMA\n");
+			uint16_t size = ((data & 0x7f) + 1);
+			gbMEM_vRamDMAFull(size * 0x10);
+			// time += size;
+			MEM[0xFF55] = 0xFF;
+		}
+		return;
+	}
+	else if(address == 0xFF69){
+		// BG color pallets
+        pallet* pal = BGColorPallet + ((MEM[0xFF68] & 0x38) >> 3);
+        switch (MEM[0xFF68] & 0x07) {
+        case 0:
+            pal->low0 = MEM[0xFF69];
+            break;
+        case 1:
+            pal->high0 = MEM[0xFF69];
+            break;
+        case 2:
+            pal->low1 = MEM[0xFF69];
+            break;
+        case 3:
+            pal->high1 = MEM[0xFF69];
+            break;
+        case 4:
+            pal->low2 = MEM[0xFF69];
+            break;
+        case 5:
+            pal->high2 = MEM[0xFF69];
+            break;
+        case 6:
+            pal->low3 = MEM[0xFF69];
+            break;
+        case 7:
+            pal->high3 = MEM[0xFF69];
+            break;
+        }
+        if(MEM[0xFF68] & 0x80){
+            MEM[0xFF68]++;
+            MEM[0xFF68] &= 0b10111111;
+        }
+	}
+	else if(address == 0xFF6B){
+		// OBJ color pallets
+        pallet* pal = OBJColorPallet + ((MEM[0xFF6A] & 0x38) >> 3);
+        switch (MEM[0xFF6A] & 0x07)
+        {
+        case 0:
+            pal->low0 = MEM[0xFF6B];
+            break;
+        case 1:
+            pal->high0 = MEM[0xFF6B];
+            break;
+        case 2:
+            pal->low1 = MEM[0xFF6B];
+            break;
+        case 3:
+            pal->high1 = MEM[0xFF6B];
+            break;
+        case 4:
+            pal->low2 = MEM[0xFF6B];
+            break;
+        case 5:
+            pal->high2 = MEM[0xFF6B];
+            break;
+        case 6:
+            pal->low3 = MEM[0xFF6B];
+            break;
+        case 7:
+            pal->high3 = MEM[0xFF6B];
+            break;
+        }
+        if(MEM[0xFF6A] & 0x80){
+            MEM[0xFF6A]++;
+            MEM[0xFF6A] &= 0b10111111;
+        }
+	}
+	else if(address == 0xFF4F){
+		// Vram check
+		MEM[address] = (data | 0xE);
+		gbMEM_swapVramBank(data);
+		return;
+	}
+	else if(address == 0xFF70){
+		// Wram check
+		gbMEM_swapWramBank(data);
+	}
+}
+
+void gbMEM_cartridgeWrite(uint16_t address, uint8_t data){
+	// Writing to cartridge ROM. probably a register
+	switch (cartMBC) {
+	case MBC::NONE:
+		//std::cout << "probably Tetris being annoying" << std::endl;
+		break;
+	case MBC::MBC1:
+		if (address < 0x2000) {
+			//Ram Enable
+			if ((data & 0x0F) == 0x0A) {
+				RAMEnabled = true;
+			}
+			else {
+				RAMEnabled = false;
+			}
+		}
+		else if (address < 0x4000) {
+			//ROM Bank Number
+			bank = data & 0x1F;
+			// if (bank == 0) {
+			// 	bank = 1;
+			// }if (banks < 16) {
+			// 	bank &= 0b00001111;
+			// }if (banks < 8) {
+			// 	bank &= 0b00000111;
+			// }if (banks < 4) {
+			// 	bank &= 0b00000011;
+			// }
+			// printf("Bank swap - %d\n", bank);
+			memcpy(MEM + 0x4000, cartridge + ((long)bank * (long)0x4000), 0x4000);
+		}
+		else if (address < 0x6000) {
+			//RAM Bank Number / upper bits
+			if(ramBanks > 1){
+				printf("Swap ram bank - MBC1\n");
+				// Save old ram
+				memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
+				// Load new data
+				ramBank = data;
+				if (ramBank > ramBanks) {
+					ramBank = 0;
+				}
+				memcpy(MEM + 0xA000, ram + (ramBank * 0x2000), 0x2000);
+			}
+			if(banks >= 64){
+				printf("ERROR: upper bits change - MBC1\n");
+			}
+		}
+		else if (address < 0x8000) {
+			//Banking Mode Select
+			printf("ERROR: Banking Mode Select - MBC1\n");
+		}
+		break;
+	case MBC::MBC5:
+		if (address < 0x2000) {
+			//Ram Enable
+			if ((data & 0x0F) == 0x0A) {
+				RAMEnabled = true;
+			}
+			else {
+				RAMEnabled = false;
+			}
+		}
+		else if (address < 0x3000) {
+			//ROM Bank Number
+			bank &= 0xFF00;
+			bank += data;
+			bank %= banks;
+			// printf("Swap rom bank - MBC5 %d\n", bank);
+			memcpy(MEM + 0x4000, cartridge + ((long)bank * (long)0x4000), 0x4000);
+		}
+		else if (address < 0x4000) {
+			//ROM Bank Number high bit
+			bank &= 0x00FF;
+			bank |= ((uint16_t)(data))<<8;
+			memcpy(MEM + 0x4000, cartridge + ((long)bank * (long)0x4000), 0x4000);
+		}
+		else if (address < 0x6000) {
+			//RAM Bank Number
+			// printf("Swap ram bank - MBC5\n");
+			// Save old ram
+			memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
+			// Load new data
+			ramBank = data;
+			memcpy(MEM + 0xA000, ram + (ramBank * 0x2000), 0x2000);
+		}
+		else if (address < 0x8000) {
+			printf("ERROR: Nothing here - MBC5\n");
+		}
+		break;
+	default:
+		break;
+	}
+	return;
+}
+
+void gb_DMA(uint8_t dest){
+	memcpy(MEM + 0xFE00, MEM + (dest << 8), 0x9F);
+}
+
+// ================ GBC Functions ==================
+
+void gbMEM_setColor() {
+	color = true;
+	MEM[0xFF4C] = 0xC0;
+	MEM[0xFF4D] = 0xfe;
+	MEM[0xFF4F] = 0xfe;
+	MEM[0xFF51] = 0xff;
+	MEM[0xFF52] = 0xff;
+	MEM[0xFF53] = 0xff;
+	MEM[0xFF54] = 0xff;
+	MEM[0xFF55] = 0xff;
+	MEM[0xFF56] = 0x3e;
+	MEM[0xFF6C] = 0x00;
+	MEM[0xFF70] = 0xf8;
+}
+
+bool gbMEM_swapWramBank(uint8_t bank)
 {
 	// printf("Swap Wram bank - GBC\n");
 	// Save old ram
@@ -517,7 +536,7 @@ bool gbMEM::swapWramBank(uint8_t bank)
 	return true;
 }
 
-bool gbMEM::swapVramBank(uint8_t bank)
+bool gbMEM_swapVramBank(uint8_t bank)
 {
 	// printf("Swap Vram bank - GBC\n");
 	// Save old ram
@@ -528,14 +547,14 @@ bool gbMEM::swapVramBank(uint8_t bank)
 	return true;
 }
 
-bool gbMEM::saveVram()
+bool gbMEM_saveVram()
 {
 	memcpy(Vram + (VramBank * 0x2000), MEM + 0x8000, 0x2000);
 	return true;
 }
 
-bool gbMEM::vRamDMAFull(uint16_t size) {
-	saveVram();
+bool gbMEM_vRamDMAFull(uint16_t size) {
+	gbMEM_saveVram();
 	uint16_t dest = ((uint16_t)MEM[0xFF51] << 8) + (uint16_t)MEM[0xFF52];
 	dest &= 0x1FF0;
 	dest |= 0x8000;
@@ -544,4 +563,40 @@ bool gbMEM::vRamDMAFull(uint16_t size) {
 
     memcpy(MEM + dest, MEM + source, size);
 	return true;
+}
+
+uint8_t gb_vramRead(uint16_t address){
+	return Vram[address];
+}
+
+// GBC get color
+uint16_t gb_getBackColor(uint8_t pallet, int color){
+	switch (color)
+	{
+	case 0:
+		return BGColorPallet[pallet].color0;
+	case 1:
+		return BGColorPallet[pallet].color1;
+	case 2:
+		return BGColorPallet[pallet].color2;
+	case 3:
+		return BGColorPallet[pallet].color3;
+	default:
+		printf("invalid bgcolor pallet\n");
+		return 0;
+	}
+}
+uint16_t gb_getObjColor(uint8_t pallet, int color){
+	switch (color)
+	{
+	case 1:
+		return OBJColorPallet[pallet].color1;
+	case 2:
+		return OBJColorPallet[pallet].color2;
+	case 3:
+		return OBJColorPallet[pallet].color3;
+	default:
+		printf("invalid objcolor pallet\n");
+		return 0;
+	}
 }

@@ -8,7 +8,6 @@
 #include "timer.h"
 
 static SDL_Renderer* renderer;
-static gbMEM* MEM;
 static gbCPU* CPU;
 static gbcPPU* PPU; 
 static inputData input;
@@ -31,14 +30,15 @@ void gbcEmulator_init(SDL_Renderer* render, SDL_Event* event) {
 	resetInputData(&input);
     e = event;
     // init mem, cpu, and ppu
-    MEM = new gbMEM();
-    CPU = new gbCPU(MEM);
-    PPU = new gbcPPU(MEM, renderer);
+    gbMEM_init();
+    gbMEM_setColor();
+    CPU = new gbCPU();
+    PPU = new gbcPPU(renderer);
     // gbAPU().APU_setMEM(MEM);
 }
 
 void gbcEmulator_deinit(){
-    delete(MEM);
+    gbMEM_deinit();
     delete(CPU);
     delete(PPU);
 }
@@ -54,19 +54,19 @@ int gbcEmulator_run() {
         static int cycle_count = 0;
         static bool speed = 0 ;
         cycle_count += 456;
-        MEM->MEM[0xFF44] = line;
+        gb_write(0xFF44, line);
         while (cycle_count > 0)
         {   
             //Update joypad
-            switch (MEM->MEM[0xFF00] & 0x30) {
+            switch (gb_read(0xFF00) & 0x30) {
             case 0x10:
-                MEM->MEM[0xFF00] = inputButtons;
+                gb_write(0xFF00, inputButtons);
                 break;
             case 0x20:
-                MEM->MEM[0xFF00] = inputDpad;
+                gb_write(0xFF00, inputDpad);
                 break;
             default:
-                MEM->MEM[0xFF00] = 0x3F;
+                gb_write(0xFF00, 0x3F);
                 break;
             }
             // Run CPU until finish line
@@ -79,9 +79,9 @@ int gbcEmulator_run() {
             cycle_count -= cycles;
 
             // Speed check
-            if(((MEM->MEM[0xFF4D]&0x80)>>7) != (MEM->MEM[0xFF4D]&0x01)){
-                MEM->MEM[0xFF4D] ^= 0x80;
-                speed = MEM->MEM[0xFF4D]&0x80;
+            if(((gb_read(0xFF4D)&0x80)>>7) != (gb_read(0xFF4D)&0x01)){
+                gb_xorWrite(0xFF4D, 0x80);
+                speed = gb_read(0xFF4D)&0x80;
             }
         }
         //Draw line
@@ -95,7 +95,7 @@ int gbcEmulator_run() {
 }
 
 int gbcEmulator_insertCart(game* game) {
-    if(MEM->insertCart(game)) {
+    if(gbMEM_insertCart(game)) {
         CPU->setColor();
         return true;
     }
