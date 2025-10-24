@@ -1,6 +1,5 @@
 #include "menu/menu.h"
 
-#include <vector>
 #include "SDL_ttf.h"
 #include "inputData.h"
 #include "game.h"
@@ -16,14 +15,14 @@
 #define BLUE    {  0,   0, 255}
 
 static SDL_Renderer* renderer;
-bool quit = false;
-std::vector<game> Roms;
+static bool quit = false;
+static game_holder Roms;
 static inputData input;
 static SDL_Event* e;
 static TTF_Font* font;
 
-unsigned int page = 0;
-unsigned int selection = 0;
+static unsigned int page = 0;
+static unsigned int selection = 0;
 
 // Initialize menu and variables
 void menu_init(SDL_Renderer* render, SDL_Event* event){
@@ -53,7 +52,7 @@ void menu_run(){
         if ((selection % 13) == 12) { page--; }
         input.up = false; // turn of so only reads once
     }
-    if (input.down && selection < Roms.size()-1){ 
+    if (input.down && selection < Roms.length-1){ 
         selection++; 
         if ((selection % 13) == 0) { page++; }
         input.down = false; // turn of so only reads once
@@ -61,7 +60,7 @@ void menu_run(){
     // Start up Consoles
     if (input.A || input.sel || input.start) {
         resetInputData(&input);
-        game* Game = &Roms[selection];
+        game* Game = Roms.games[selection];
         switch (Game->system) {
         case GB:
             gbEmulator_init(renderer, e);
@@ -93,7 +92,7 @@ void menu_run(){
     // Delete save file
     if (input.B){
         resetInputData(&input);
-        game* Game = &Roms[selection];
+        game* Game = Roms.games[selection];
         if(Game->has_save){
             menu_alert(ALERT_WARNING, "Delete Save? A-yes B-no");
             if(input.A){
@@ -113,24 +112,24 @@ void menu_run(){
     // Draw current menu screen
     unsigned int y = 5;
     for (unsigned int i = 0; i < 13;i++) { // all menu options
-        if (i + (page * 13) < Roms.size()) { // Load in roms on the page
+        if (i + (page * 13) < Roms.length) { // Load in roms on the page
             SDL_Color color;
-            switch (Roms[i + (page * 13)].system) {
+            switch (Roms.games[i + (page * 13)]->system) {
             case GB:
-                color = RED;
+                color = (SDL_Color)RED;
                 break;
             case GBC:
-                color = GREEN;
+                color = (SDL_Color)GREEN;
                 break;
             case GBA:
-                color = BLUE;
+                color = (SDL_Color)BLUE;
                 break;
             }
 
             // as TTF_RenderText_Solid could only be used on
             // SDL_Surface then you have to create the surface first
             SDL_Surface* surfaceMessage =
-                TTF_RenderText_Solid(font, Roms[i + (page * 13)].name.c_str(), color); 
+                TTF_RenderText_Solid(font, Roms.games[i + (page * 13)]->name, color); 
 
             // now you can convert it into a texture
             SDL_Texture* Message = SDL_CreateTextureFromSurface(renderer, surfaceMessage);
@@ -138,7 +137,7 @@ void menu_run(){
             SDL_Rect Message_rect; //create a rect
             Message_rect.x = 10;  //controls the rect's x coordinate 
             Message_rect.y = y+2; // controls the rect's y coordinate
-            Message_rect.w = Roms[i + (page * 13)].name.length()*5; // controls the width of the rect
+            Message_rect.w = strlen(Roms.games[i + (page * 13)]->name)*5; // controls the width of the rect
             Message_rect.h = 8; // controls the height of the rect
             SDL_RenderCopy(renderer, Message, NULL, &Message_rect);
 
@@ -146,19 +145,19 @@ void menu_run(){
             SDL_FreeSurface(surfaceMessage);
             SDL_DestroyTexture(Message);
 
-            if(Roms[i + (page * 13)].has_save){
+            if(Roms.games[i + (page * 13)]->has_save){
                 SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
                 SDL_Point save_lines[10];
-                save_lines[0] = {142,(int)(y)};
-                save_lines[1] = {148,(int)(y)};
-                save_lines[2] = {150,(int)(y+2)};
-                save_lines[3] = {150,(int)(y+8)};
-                save_lines[4] = {144,(int)(y+8)};
-                save_lines[5] = {144,(int)(y+5)};
-                save_lines[6] = {148,(int)(y+5)};
-                save_lines[7] = {148,(int)(y+8)};
-                save_lines[8] = {142,(int)(y+8)};
-                save_lines[9] = {142,(int)(y)};
+                save_lines[0] = (SDL_Point){142,(int)(y)};
+                save_lines[1] = (SDL_Point){148,(int)(y)};
+                save_lines[2] = (SDL_Point){150,(int)(y+2)};
+                save_lines[3] = (SDL_Point){150,(int)(y+8)};
+                save_lines[4] = (SDL_Point){144,(int)(y+8)};
+                save_lines[5] = (SDL_Point){144,(int)(y+5)};
+                save_lines[6] = (SDL_Point){148,(int)(y+5)};
+                save_lines[7] = (SDL_Point){148,(int)(y+8)};
+                save_lines[8] = (SDL_Point){142,(int)(y+8)};
+                save_lines[9] = (SDL_Point){142,(int)(y)};
                 SDL_RenderDrawLines(renderer, save_lines, 10);
             }
 
@@ -198,13 +197,13 @@ void menu_alert(AlertLevel_t level, const char* text){
     SDL_Color color;
     switch (level){
     case ALERT_INFO:
-        color = {0xFF, 0xFF, 0xFF};
+        color = (SDL_Color){0xFF, 0xFF, 0xFF};
     break;
     case ALERT_WARNING:
-        color = {0x88, 0x44, 0x00};
+        color = (SDL_Color){0x88, 0x44, 0x00};
     break;
     case ALERT_ERROR:
-        color = {0x88, 0x00, 0x00};
+        color = (SDL_Color){0x88, 0x00, 0x00};
     break;
     default:
         
@@ -214,7 +213,7 @@ void menu_alert(AlertLevel_t level, const char* text){
     // Draw Text
     SDL_Surface* surfaceMessage = TTF_RenderText_Solid(font, text, color); 
     SDL_Texture* Message = SDL_CreateTextureFromSurface(renderer, surfaceMessage);
-    r = {10,128,(int)strlen(text)*5,8};
+    r = (SDL_Rect){10,128,(int)strlen(text)*5,8};
     SDL_RenderCopy(renderer, Message, NULL, &r);
 
     // Clean up

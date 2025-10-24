@@ -8,8 +8,6 @@
 #include "timer.h"
 
 static SDL_Renderer* renderer;
-static gbCPU* CPU;
-static gbPPU* PPU; 
 static inputData input;
 static SDL_Event* e;
 
@@ -31,15 +29,15 @@ void gbEmulator_init(SDL_Renderer* render, SDL_Event* event) {
     e = event;
     // init mem, cpu, and ppu
     gbMEM_init();
-    CPU = new gbCPU();
-    PPU = new gbPPU(renderer);
+    gbCPU_init();
+    gbPPU_init(render);
     // gbAPU().APU_setMEM(MEM);
 }
 
 void gbEmulator_deinit(){
     gbMEM_deinit();
-    delete(CPU);
-    delete(PPU);
+    gbCPU_deinit();
+    gbPPU_deinit();
 }
 
 int gbEmulator_run() {
@@ -69,17 +67,17 @@ int gbEmulator_run() {
             }
             // Run CPU until finish line
             // CPU->printInstruction();
-            uint8_t cycles = CPU->instruction();
-            cycles += CPU->interrupts(cycles);
-            CPU->timers(cycles);
+            uint8_t cycles = gbCPU_instruction();
+            cycles += gbCPU_interrupts(cycles);
+            gbCPU_timers(cycles);
 
             cycle_count -= cycles;
-            PPU->updatePPU(cycle_count);
+            gbPPU_updatePPU(cycle_count);
         }
         //Draw line
-        PPU->drawLine();
+        gbPPU_drawLine();
     }
-    PPU->renderFrame();
+    gbPPU_renderFrame();
     SDL_RenderPresent(renderer);
     timer_end();
     timer_buff();

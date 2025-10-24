@@ -1,124 +1,20 @@
 #include "gbc/gbcPPU.h"
+#include "gb/gbMEM.h"
+#include "globals.h"
 
-gbcPPU::gbcPPU(SDL_Renderer *rend) {
-    renderer = rend;
-	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
-	lastDMA = gb_read(0xff55);
-}
+static SDL_Renderer* renderer;
+static SDL_Texture* texture;
 
-void gbcPPU::drawLine() {
-
-	if (gb_read(0xFF44) == 144) {
-		//turn on V-blank flag
-		gb_orWrite(0xFF41, 0b00000001);
-		gb_andWrite(0xFF41, 0b11111101);
-		gb_orWrite(0xFF0F, 0b00000001);	//V-blank interrupt
-		if (gb_read(0xFF41) & 0b00010000) {
-			gb_orWrite(0xFF0F, 0b00000010);
-			//vblank stat interrupt
-		}
-	}
-	
-	if (gb_read(0xFF44) < 144) {
-		// Save Vram before drawing
-		gbMEM_saveVram();
-		drawBackground();
-		if (gb_read(0xFF40) & 0b00100000) {
-			//Window Enable
-			drawWindow();
-		}
-        if (gb_read(0xFF40) & 0b00000010) {
-            //Sprite Enable
-            drawSprites();
-        }
-	}
-}
-
-uint32_t gbcPPU::updatePPU(int cycles) {
-	uint32_t time = 0;
-
-	// Cycles is how many cycles are left in the line 456-0
-	if(gb_read(0xFF44) < 144) {
-		if(cycles > (456-80)) {
-			// Mode 2: OAM Scan
-			gb_orWrite(0xFF41, 0b00000010);
-			gb_andWrite(0xFF41, 0b11111110);
-
-			if (gb_read(0xFF41) & 0b00100000) {
-				gb_orWrite(0xFF0F, 0b00000010);
-				// OAM Scan stat interrupt
-			}
-		}
-		else if(cycles > (456-200)) {
-			// Mode 3: Drawing
-			gb_orWrite(0xFF41, 0b00000011);
-		}
-		else {
-			// Mode 0: H-Blank
-			gb_andWrite(0xFF41, 0b11111100);
-
-			if (gb_read(0xFF41) & 0b00001000) {
-				gb_orWrite(0xFF0F, 0b00000010);
-				//Hb-lank stat interrupt
-			}
-		}
-	}
+static uint8_t BGPriority[160];
+static uint8_t line[160];
+static uint16_t Vram[160][144];
 
 
-	if (gb_read(0xFF44) == gb_read(0xFF45)) {
-		//LYC == LY
-		gb_orWrite(0xFF41, 0b00000100);
-		if (gb_read(0xFF41) & 0b01000000) {
-			gb_orWrite(0xFF0F, 0b00000010);
-		}
-	}
-	else {
-		//LYC != LY
-		gb_andWrite(0xFF41, 0b11111011);
-		if (gb_read(0xFF41) & 0b01000000) {
-			gb_andWrite(0xFF0F, 0b11111101);
-		}
-	}
+static uint8_t lastDMA;
 
-	return time;
-}
+// ================= Helper Functions ==============
 
-void gbcPPU::renderFrame() {
-	// Credit to DOOMReboot on Github for the pixel pusher system! https://github.com/DOOMReboot
-	// The Back Buffer texture may be stored with an extra bit of width (pitch) on the video card in order to properly
-    // align it in VRAM should the width not lie on the correct memory boundary (usually four bytes).
-    int32_t pitch = 0;
-
-    // This will hold a pointer to the memory position in VRAM where our Back Buffer texture lies
-    uint32_t* pixelBuffer = nullptr;
-
-    // Lock the memory in order to write our Back Buffer image to it
-    if (!SDL_LockTexture(texture, NULL, (void**)&pixelBuffer, &pitch))
-    {
-        // The pitch of the Back Buffer texture in VRAM must be divided by four bytes
-        // as it will always be a multiple of four
-        pitch /= sizeof(uint32_t);
-
-        // Draw frame to texture
-        for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
-			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
-				uint16_t data =  Vram[y][x];
-				uint8_t red = data&0x001F ;
-				uint8_t green = (data&0x03E0)>>5;
-				uint8_t blue = (data&0x7C00)>>10;
-				uint32_t pixel = (red << 19) | (green << 11) | (blue << 3);
-                pixelBuffer[(x*(SCREEN_WIDTH)) + y] = pixel;
-			}
-		}
-
-        // Unlock the texture in VRAM and send to renderer!
-        SDL_UnlockTexture(texture);
-        SDL_RenderCopy(renderer, texture, NULL, NULL);
-    }
-	return;
-}
-
-void gbcPPU::drawBackground() {
+void drawBackground() {
     int addressBase;
 	bool sign;
 	if (gb_read(0xFF40) & 0b00010000) {
@@ -185,7 +81,7 @@ void gbcPPU::drawBackground() {
 	}
 }
 
-void gbcPPU::drawWindow() {
+void drawWindow() {
     int addressBase;
 	bool sign;
 	if (gb_read(0xFF40) & 0b00010000) {
@@ -260,34 +156,37 @@ void gbcPPU::drawWindow() {
 	}
 }
 
-void gbcPPU::drawSprites() {
+void drawSprites() {
 	bool size = 0;
 	if (gb_read(0xFF40) & 0b00000100) {
 		size = 1; //set sprite size to 8x16
 	}
 	uint8_t y = gb_read(0xFF44);
 	//draw Sprites on Vram
-	std::vector<int> sprites_to_draw;
+	int sprites_to_draw[40];
+	int sprite_num = 0;
 	for (int s = 0; s < 40; s++) {
-		if(sprites_to_draw.size() == 10){break;}
+		if(sprite_num == 10){break;}
 		int ypos = gb_read(0xFE00 + (s * 4)) - 16;
 		if (size) {
 			if (y>=ypos && y < ypos+16) {
-				sprites_to_draw.push_back(s);
+				sprites_to_draw[sprite_num] = s;
+				sprite_num++;
 			}
 		}
 		else {
 			if (y>=ypos && y < ypos+8) {
-				sprites_to_draw.push_back(s);
+				sprites_to_draw[sprite_num] = s;
+				sprite_num++;
 			}
 		}
 	}
-	for (auto s : sprites_to_draw) {
-		int ypos = gb_read(0xFE00 + (s * 4)) - 16;
-		int xpos = gb_read((0xFE00 + (s * 4)) + 1) - 8;
-		uint8_t tile = gb_read((0xFE00 + (s * 4)) + 2);
+	for (int s = 0; s < sprite_num; s++) {
+		int ypos = gb_read(0xFE00 + (sprites_to_draw[s] * 4)) - 16;
+		int xpos = gb_read((0xFE00 + (sprites_to_draw[s] * 4)) + 1) - 8;
+		uint8_t tile = gb_read((0xFE00 + (sprites_to_draw[s] * 4)) + 2);
 		if(size){tile &= 0xFE;}
-		uint8_t flags = gb_read((0xFE00 + (s * 4)) + 3);
+		uint8_t flags = gb_read((0xFE00 + (sprites_to_draw[s] * 4)) + 3);
 		int r = y - ypos;
 		uint8_t pal = flags&0x07;
 		bool bank = (flags&0b00001000) ? 1 : 0;
@@ -323,4 +222,128 @@ void gbcPPU::drawSprites() {
 			}
 		}
 	}
+}
+
+// ==================== Functions ==================
+
+void gbcPPU_init(SDL_Renderer *rend) {
+    renderer = rend;
+	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
+	lastDMA = gb_read(0xff55);
+}
+
+void gbcPPU_deinit(){
+	SDL_DestroyTexture(texture);
+}
+
+void gbcPPU_drawLine() {
+
+	if (gb_read(0xFF44) == 144) {
+		//turn on V-blank flag
+		gb_orWrite(0xFF41, 0b00000001);
+		gb_andWrite(0xFF41, 0b11111101);
+		gb_orWrite(0xFF0F, 0b00000001);	//V-blank interrupt
+		if (gb_read(0xFF41) & 0b00010000) {
+			gb_orWrite(0xFF0F, 0b00000010);
+			//vblank stat interrupt
+		}
+	}
+	
+	if (gb_read(0xFF44) < 144) {
+		// Save Vram before drawing
+		gbMEM_saveVram();
+		drawBackground();
+		if (gb_read(0xFF40) & 0b00100000) {
+			//Window Enable
+			drawWindow();
+		}
+        if (gb_read(0xFF40) & 0b00000010) {
+            //Sprite Enable
+            drawSprites();
+        }
+	}
+}
+
+uint32_t gbcPPU_updatePPU(int cycles) {
+	uint32_t time = 0;
+
+	// Cycles is how many cycles are left in the line 456-0
+	if(gb_read(0xFF44) < 144) {
+		if(cycles > (456-80)) {
+			// Mode 2: OAM Scan
+			gb_orWrite(0xFF41, 0b00000010);
+			gb_andWrite(0xFF41, 0b11111110);
+
+			if (gb_read(0xFF41) & 0b00100000) {
+				gb_orWrite(0xFF0F, 0b00000010);
+				// OAM Scan stat interrupt
+			}
+		}
+		else if(cycles > (456-200)) {
+			// Mode 3: Drawing
+			gb_orWrite(0xFF41, 0b00000011);
+		}
+		else {
+			// Mode 0: H-Blank
+			gb_andWrite(0xFF41, 0b11111100);
+
+			if (gb_read(0xFF41) & 0b00001000) {
+				gb_orWrite(0xFF0F, 0b00000010);
+				//Hb-lank stat interrupt
+			}
+		}
+	}
+
+
+	if (gb_read(0xFF44) == gb_read(0xFF45)) {
+		//LYC == LY
+		gb_orWrite(0xFF41, 0b00000100);
+		if (gb_read(0xFF41) & 0b01000000) {
+			gb_orWrite(0xFF0F, 0b00000010);
+		}
+	}
+	else {
+		//LYC != LY
+		gb_andWrite(0xFF41, 0b11111011);
+		if (gb_read(0xFF41) & 0b01000000) {
+			gb_andWrite(0xFF0F, 0b11111101);
+		}
+	}
+
+	return time;
+}
+
+void gbcPPU_renderFrame() {
+	// Credit to DOOMReboot on Github for the pixel pusher system! https://github.com/DOOMReboot
+	// The Back Buffer texture may be stored with an extra bit of width (pitch) on the video card in order to properly
+    // align it in VRAM should the width not lie on the correct memory boundary (usually four bytes).
+    int32_t pitch = 0;
+
+    // This will hold a pointer to the memory position in VRAM where our Back Buffer texture lies
+    uint32_t* pixelBuffer = NULL;
+
+    // Lock the memory in order to write our Back Buffer image to it
+    if (!SDL_LockTexture(texture, NULL, (void**)&pixelBuffer, &pitch))
+    {
+        // The pitch of the Back Buffer texture in VRAM must be divided by four bytes
+        // as it will always be a multiple of four
+        pitch /= sizeof(uint32_t);
+
+        // Draw frame to texture
+        for (uint32_t x = 0; x < (SCREEN_HEIGHT); x++){
+			for(uint32_t y = 0; y < (SCREEN_WIDTH); y++){
+				uint16_t data =  Vram[y][x];
+				uint8_t red = data&0x001F ;
+				uint8_t green = (data&0x03E0)>>5;
+				uint8_t blue = (data&0x7C00)>>10;
+				uint32_t pixel = (red << 19) | (green << 11) | (blue << 3);
+                pixelBuffer[(x*(SCREEN_WIDTH)) + y] = pixel;
+			}
+		}
+
+        // Unlock the texture in VRAM and send to renderer!
+        SDL_UnlockTexture(texture);
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+    }
+	return;
 }

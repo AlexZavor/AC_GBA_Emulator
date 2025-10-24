@@ -4,6 +4,8 @@ to the Game boy series of consoles.
 
 don't expect it to run great on every computer.
 
+Written in glorious C
+
 
 ## Build Directions
 ### Windows

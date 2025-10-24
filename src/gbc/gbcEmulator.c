@@ -8,8 +8,6 @@
 #include "timer.h"
 
 static SDL_Renderer* renderer;
-static gbCPU* CPU;
-static gbcPPU* PPU; 
 static inputData input;
 static SDL_Event* e;
 
@@ -32,15 +30,16 @@ void gbcEmulator_init(SDL_Renderer* render, SDL_Event* event) {
     // init mem, cpu, and ppu
     gbMEM_init();
     gbMEM_setColor();
-    CPU = new gbCPU();
-    PPU = new gbcPPU(renderer);
+    gbCPU_init();
+    gbCPU_setColor();
+    gbcPPU_init(render);
     // gbAPU().APU_setMEM(MEM);
 }
 
 void gbcEmulator_deinit(){
     gbMEM_deinit();
-    delete(CPU);
-    delete(PPU);
+    gbCPU_deinit();
+    gbcPPU_deinit();
 }
 
 int gbcEmulator_run() {
@@ -71,10 +70,10 @@ int gbcEmulator_run() {
             }
             // Run CPU until finish line
             // CPU->printInstruction();
-            uint8_t cycles = (CPU->instruction())/(1+(speed?1:0));
-            cycle_count -= PPU->updatePPU(cycle_count);
-            cycles += (CPU->interrupts(cycles))/(1+(speed?1:0));
-            CPU->timers(cycles);
+            uint8_t cycles = (gbCPU_instruction())/(1+(speed?1:0));
+            cycle_count -= gbcPPU_updatePPU(cycle_count);
+            cycles += (gbCPU_interrupts(cycles))/(1+(speed?1:0));
+            gbCPU_timers(cycles);
 
             cycle_count -= cycles;
 
@@ -85,9 +84,9 @@ int gbcEmulator_run() {
             }
         }
         //Draw line
-        PPU->drawLine();
+        gbcPPU_drawLine();
     }
-    PPU->renderFrame();
+    gbcPPU_renderFrame();
     SDL_RenderPresent(renderer);
     timer_end();
     timer_buff();
@@ -96,7 +95,6 @@ int gbcEmulator_run() {
 
 int gbcEmulator_insertCart(game* game) {
     if(gbMEM_insertCart(game)) {
-        CPU->setColor();
         return true;
     }
     else {

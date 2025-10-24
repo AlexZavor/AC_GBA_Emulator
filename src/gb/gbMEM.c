@@ -1,7 +1,10 @@
 #include "gb/gbMEM.h"
 
-#include <sys/stat.h> //For creating save folder
-#include <fstream>
+#include "sys/stat.h" //For creating save folder
+// #include <fstream>
+#include "fcntl.h"
+#include <sys/mman.h>
+#include "unistd.h"
 #include "globals.h"
 #include "stdio.h"
 #include "string.h"
@@ -34,7 +37,7 @@ Echo of 8kB Internal RAM
 */
 
 // ----------- cartridge data -----------
-game* game_p;
+static game* game_p;
 typedef enum{
 	NONE,
 	MBC1,
@@ -42,32 +45,34 @@ typedef enum{
 	MBC3,
 	MBC5,
 }MBC;
-MBC cartMBC;
-uint16_t bank;
-uint16_t banks;
-uint8_t ramBank;
-uint8_t ramBanks;
-bool RAMEnabled;
-bool battery;
-bool RAM;
-bool timer;
-bool rumble;
+static MBC cartMBC;
+static uint16_t bank;
+static uint16_t banks;
+static uint8_t ramBank;
+static uint8_t ramBanks;
+static bool RAMEnabled;
+static bool battery;
+static bool RAM;
+static bool timer;
+static bool rumble;
 
 // System Memory
 uint8_t MEM[0x10000];
 
-uint8_t Vram[0x4000];
-uint8_t VramBank = 1;
+static uint8_t Vram[0x4000];
+static uint8_t VramBank = 1;
 
-char* cartridge;
-char* ram;
+static uint8_t* cartridge;
+static int cart_fd;
+static struct stat  cart_sb;
+static uint8_t* ram;
 
 // GBC variables
 bool color = false;
-pallet BGColorPallet[8];
-pallet OBJColorPallet[8];
-uint8_t Wram[0x8000];
-uint8_t WramBank = 1;
+static pallet BGColorPallet[8];
+static pallet OBJColorPallet[8];
+static uint8_t Wram[0x8000];
+static uint8_t WramBank = 1;
 
 
 
@@ -75,7 +80,7 @@ uint8_t WramBank = 1;
 // sets inital values in the memory and for the cartridge
 void initMem() {
 	WramBank = 1;
-	cartMBC = MBC::NONE;
+	cartMBC = NONE;
 	RAMEnabled = false;
 	bank = 1;
 	banks = 2;
@@ -103,77 +108,77 @@ bool setMBC(uint8_t code) {
 	{
 	// No MBC
 	case 0x00:
-		cartMBC = MBC::NONE;
+		cartMBC = NONE;
 		return true;
 	// MBC 1
 	case 0x01:
-		cartMBC = MBC::MBC1;
+		cartMBC = MBC1;
 		return true;
 	case 0x02:
-		cartMBC = MBC::MBC1;
+		cartMBC = MBC1;
 		RAM = true;
 		return true;
 	case 0x03:
-		cartMBC = MBC::MBC1;
+		cartMBC = MBC1;
 		RAM = true;
 		battery = true;
 		return true;
 	// MBC 2 - Unimplemented
 	case 0x05:
-		cartMBC = MBC::MBC2;
+		cartMBC = MBC2;
 		return false;
 	case 0x06:
-		cartMBC = MBC::MBC2;
+		cartMBC = MBC2;
 		battery = true;
 		return false;
 	// MBC 3 - Unimplemented
 	case 0x0F:
-		cartMBC = MBC::MBC3;
+		cartMBC = MBC3;
 		timer = true;
 		battery = true;
 		return false;
 	case 0x10:
-		cartMBC = MBC::MBC3;
+		cartMBC = MBC3;
 		timer = true;
 		RAM = true;
 		battery = true;
 		return false;
 	case 0x11:
-		cartMBC = MBC::MBC3;
+		cartMBC = MBC3;
 		return false;
 	case 0x12:
-		cartMBC = MBC::MBC3;
+		cartMBC = MBC3;
 		RAM = true;
 		return false;
 	case 0x13:
-		cartMBC = MBC::MBC3;
+		cartMBC = MBC3;
 		RAM = true;
 		battery = true;
 		return false;
 	// MBC 5
 	case 0x19:
-		cartMBC = MBC::MBC5;
+		cartMBC = MBC5;
 		return true;
 	case 0x1A:
-		cartMBC = MBC::MBC5;
+		cartMBC = MBC5;
 		RAM = true;
 		return true;
 	case 0x1B:
-		cartMBC = MBC::MBC5;
+		cartMBC = MBC5;
 		RAM = true;
 		battery = true;
 		return true;
 	case 0x1C:
-		cartMBC = MBC::MBC5;
+		cartMBC = MBC5;
 		rumble = true;
 		return true;
 	case 0x1D:
-		cartMBC = MBC::MBC5;
+		cartMBC = MBC5;
 		rumble = true;
 		RAM = true;
 		return true;
 	case 0x1E:
-		cartMBC = MBC::MBC5;
+		cartMBC = MBC5;
 		rumble = true;
 		RAM = true;
 		battery = true;
@@ -211,16 +216,18 @@ bool setRam(uint8_t code) {
 	default:
 		return false;
 	}
-	ram = new char[(int)ramBanks * 0x2000];
+	ram = (uint8_t*)calloc((int)ramBanks * 0x2000, sizeof(uint8_t));
 	if (ramBanks && battery) {
 		printf("Loading save file - ");
-		std::ifstream file(SAVE_DIR + (game_p->name) + ".SAV", std::ios::in | std::ios::binary | std::ios::ate);
-		if (file.is_open())
+		char save_path[512];
+		sprintf(save_path, "%s%s.SAV", SAVE_DIR, game_p->name);
+		int fd = open(save_path, O_RDWR);
+		if (fd > 0)
 		{
-			file.seekg(0, std::ios::beg);
-			file.read(ram, (int)ramBanks * 0x2000);
-			file.close();
-			// memcpy(MEM + 0xA000, ram + (ramBank*0x2000), 0x2000);
+			lseek(fd, 0, SEEK_SET);
+			read(fd, ram, ramBanks*0x2000);
+			close(fd);
+			memcpy(MEM + 0xA000, ram + (ramBank*0x2000), 0x2000);
 			printf("save loaded!\n");
 		}
 		else {
@@ -232,15 +239,18 @@ bool setRam(uint8_t code) {
 
 bool saveRam() {
 	if (ramBanks > 0 && battery) {
-		// memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
+		memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
 		mkdir(SAVE_DIR, 0777);
-		std::ofstream file(SAVE_DIR + (game_p->name) + ".SAV");
-		file.open(SAVE_DIR + (game_p->name) + ".SAV", std::ios::out | std::ios::binary);
-		if (file.is_open())
+		char save_path[512];
+		sprintf(save_path, "%s%s.SAV", SAVE_DIR, game_p->name);
+		int fd = open(save_path, O_CREAT|O_RDWR|O_TRUNC);
+		// std::ofstream file(SAVE_DIR + (game_p->name) + ".SAV");
+		// file.open(SAVE_DIR + (game_p->name) + ".SAV", std::ios::out | std::ios::binary);
+		if (fd > 0)
 		{
-			file.clear();
-			file.write((char*)ram, (int)ramBanks * 0x2000);
-			file.close();
+			lseek(fd, 0, SEEK_SET);
+			write(fd, ram, ramBanks*0x2000);
+			close(fd);
 			printf("Game Saved\n");
 			game_p->has_save = true;
 			return 1;
@@ -268,21 +278,34 @@ void gbMEM_deinit()
 {
 	saveRam();
 	memset(MEM, 0, 0x10000); // unload the cartridge and memory
+	if(ram != NULL)
+		free(ram);
+	if(cart_fd >0){
+		munmap(cartridge, cart_sb.st_size);
+		close(cart_fd);
+	}
 	game_p = NULL;
 }
 
 int gbMEM_insertCart(game* g){
-	// TODO: MMap?
-	std::streampos size;
-	std::ifstream file2(GAME_DIR + g->name, std::ios::in | std::ios::binary | std::ios::ate);
-	if (file2.is_open())
+	char filepath[512];
+	sprintf(filepath, "%s%s", GAME_DIR, g->name);
+	cart_fd = open(filepath, O_RDONLY);
+	// std::ifstream file2(GAME_DIR + g->name, std::ios::in | std::ios::binary | std::ios::ate);
+	if (cart_fd >= 0)
 	{
-		size = file2.tellg();
-		cartridge = new char[(int)size];
+		fstat(cart_fd, &cart_sb);
+		cartridge = mmap(NULL, cart_sb.st_size, PROT_READ,
+			MAP_PRIVATE, cart_fd, 0);
 		game_p = g;
-		file2.seekg(0, std::ios::beg);
-		file2.read(cartridge, size);
-		file2.close();
+			/*
+			size = file2.tellg();
+			cartridge = new char[(int)size];
+			
+			file2.seekg(0, std::ios::beg);
+			file2.read(cartridge, size);
+			file2.close();
+			*/
 		memcpy(MEM, cartridge, 0x8000);
 		if (!setMBC(MEM[0x0147])) {
 			printf("\nUnrecognized MBC - %.2X\n", MEM[0x0147]);
@@ -407,10 +430,10 @@ void gbMEM_colorWriteChecks(uint16_t address, uint8_t data){
 void gbMEM_cartridgeWrite(uint16_t address, uint8_t data){
 	// Writing to cartridge ROM. probably a register
 	switch (cartMBC) {
-	case MBC::NONE:
+	case NONE:
 		//std::cout << "probably Tetris being annoying" << std::endl;
 		break;
-	case MBC::MBC1:
+	case MBC1:
 		if (address < 0x2000) {
 			//Ram Enable
 			if ((data & 0x0F) == 0x0A) {
@@ -457,7 +480,7 @@ void gbMEM_cartridgeWrite(uint16_t address, uint8_t data){
 			printf("ERROR: Banking Mode Select - MBC1\n");
 		}
 		break;
-	case MBC::MBC5:
+	case MBC5:
 		if (address < 0x2000) {
 			//Ram Enable
 			if ((data & 0x0F) == 0x0A) {

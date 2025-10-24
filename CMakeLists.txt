@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(GameBoyAdvanceEmulator  VERSION 1.0.0
-        DESCRIPTION "C++ implemented emulator for the Game Boy Advance"
-        LANGUAGES C CXX)
+        DESCRIPTION "C implemented emulator for the Game Boy Advance"
+        LANGUAGES C)
         
 # Debug system that can be set TRUE or FALSE
 set(DEBUG TRUE)
@@ -14,7 +14,7 @@ include_directories(include/SDL2)
 
 ############### Main Build ###############
 
-file(GLOB_RECURSE GBA_SRC CONFIGURE_DEPENDS "src/***.c***")
+file(GLOB_RECURSE GBA_SRC CONFIGURE_DEPENDS "src/***.c")
 
 add_executable(GBA ${GBA_SRC})
 
@@ -31,11 +31,11 @@ target_link_libraries(GBA SDL2_ttf)
 target_link_libraries(GBA SDL2)
 
 if(DEBUG)
-    set(CMAKE_CXX_FLAGS "-Wall -DDEBUG")
+    set(CMAKE_C_FLAGS "-Wall -DDEBUG")
 else()
     if(WIN32)
-    set(CMAKE_CXX_FLAGS "-Wl,--subsystem,windows -O3")  
+    set(CMAKE_C_FLAGS "-Wl,--subsystem,windows -O3")  
     else()
-    set(CMAKE_CXX_FLAGS "-Wl, -O3")  
+    set(CMAKE_C_FLAGS "-Wl, -O3")  
     endif()
 endif()

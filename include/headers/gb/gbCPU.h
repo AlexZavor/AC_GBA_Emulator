@@ -1,8 +1,6 @@
 #ifndef GBCPU_H
 #define GBCPU_H
-#include <stdint.h>
-#include <cstring>
-#include "gb/gbMEM.h"
+#include "stdint.h"
 
 struct reg {
     struct {
@@ -49,48 +47,15 @@ struct reg {
     unsigned short pc;
 };
 
-class gbCPU{
-    private:
-        //Main CPU Registers, A,B,C,D,E,F,H,L,sp,pc.
-        //also addressable through common combinations like HL or AF
-        struct reg registers;
+void gbCPU_init();
+void gbCPU_deinit();
+//Returns number of cycles taken to execute
+uint8_t gbCPU_instruction();
+void gbCPU_printInstruction();
 
-        
-        bool IME; //Interrupt Master Enable
-        bool preIME; //used because IME only returns after one instruction
-        bool halted; //Shows if the CPU is Halted
-        uint8_t DMA;
-        uint8_t DIV;
-        int lineprogress;
+void gbCPU_timers(uint8_t clock);
+int gbCPU_interrupts(int cycles);
 
-    public:
-        gbCPU();
-        //Returns number of cycles taken to execute
-        uint8_t instruction();
-        void printInstruction();
-
-        void timers(uint8_t clock);
-        int interrupts(int cycles);
-
-        void setColor();
-    
-    private:
-        //set registers to correct values
-        void initCpu();
-        //Push data onto the stack
-        inline void PushStack(uint8_t data);
-        //Pop data off stack
-        inline uint8_t PopStack();
-        //Set of extra instructions
-        uint8_t CBPrefix();
-        //Flag setting functions
-        inline void setZ(bool set);
-        inline void setN(bool set);
-        inline void setH(bool set);
-        inline void setC(bool set);
-        //for error Handling
-        void Failure(int code);
-
-};
+void gbCPU_setColor();
 
 #endif /* GBMEM_H */

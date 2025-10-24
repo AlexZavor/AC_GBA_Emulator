@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include "stdio.h"
 #include "globals.h"
 #include "SDL.h"
 #include "SDL_ttf.h"
@@ -22,8 +22,7 @@ GBA
 	Start Research
 */
 
-// TODO: Reorganize system from C++ to C based (init and update func.)
-// TODO: GB sub-systems refactor (cpu macros, better mem unit)
+// TODO: Audio system sadly
 
 
 

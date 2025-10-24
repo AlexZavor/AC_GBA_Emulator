@@ -1,0 +1,4790 @@
+#include "gb/gbCPU.h"
+#include "gb/gbMEM.h"
+#include "stdio.h"
+
+// #define LOGFILE
+
+#ifdef LOGFILE
+#include <fstream>
+std::ofstream myfile;
+#endif
+
+#define ZMASK 0b10000000
+#define NMASK 0b01000000
+#define HMASK 0b00100000
+#define CMASK 0b00010000
+
+//Main CPU Registers, A,B,C,D,E,F,H,L,sp,pc.
+//also addressable through common combinations like HL or AF
+struct reg registers;
+
+
+static bool IME; //Interrupt Master Enable
+static bool preIME; //used because IME only returns after one instruction
+static bool halted; //Shows if the CPU is Halted
+static uint8_t DMA;
+static uint8_t DIV;
+static int lineprogress;
+
+// =============== Helper Functions ====================
+
+// Push and pop stack
+static inline void PushStack(uint8_t data) {
+    registers.sp--;
+    gb_write(registers.sp, data);
+}
+static inline uint8_t PopStack() {
+    uint8_t data = gb_read(registers.sp);
+    registers.sp++;
+    return data;
+}
+
+// Set and reset flag functions
+static inline void setZ(bool set) {
+	if (set) {
+		registers.f |= ZMASK;
+	}
+	else {
+		registers.f &= ~ZMASK;
+	}
+}
+static inline void setN(bool set) {
+	if (set) {
+		registers.f |= NMASK;
+	}
+	else {
+		registers.f &= ~NMASK;
+	}
+}
+static inline void setH(bool set) {
+	if (set) {
+		registers.f |= HMASK;
+	}
+	else {
+		registers.f &= ~HMASK;
+	}
+}
+static inline void setC(bool set) {
+    if (set) {
+        registers.f |= CMASK;
+    }
+    else {
+        registers.f &= ~CMASK;
+    }
+}
+
+// Called to print errors
+void Failure(int code) {
+	switch (code) {
+	case 0:
+		printf("Failed Instruction! Code: 0x%.2X\n \tPC: 0x%.4X\n", gb_read(registers.pc), registers.pc);
+		break;
+	case 1:
+		printf("Hit invalid Opcode! Code: 0x%.2X\n \tPC: 0x%.4X\n", gb_read(registers.pc), registers.pc);
+		break;
+	case 2:
+		printf("Failed CB Instruction! Code: 0xCB 0x%.2X\n", gb_read(registers.pc));
+		break;
+	case 3:
+		printf("HALT! \t PC: 0x%.2X\n", registers.pc);
+		break;
+	case 4:
+		printf("Interrupt Err \t PC: 0x%.2X\n", registers.pc);
+		break;
+    default:
+        printf("unknown error\n");
+	}
+}
+
+// Set all inital values
+void initCpu() {
+	registers = (struct reg){ {{{0x00,0xB0}}},{{{0x00,0x13}}},{{{0x00,0xd8}}},{{{0x01,0x4d}}},0xFFFE,0x0100};
+	IME = 0; //Interrupt Master Enable
+	preIME = 0; //used because IME only returns after one instruction
+	halted = 0; //Shows if the CPU is Halted
+	DMA = 0xE1;
+	DIV = 0x00;
+	lineprogress = 0;
+
+	#ifdef LOGFILE
+  	myfile.open ("Debug.log");
+	#endif
+}
+
+// ===================== Functions =====================
+
+void gbCPU_init() {
+    initCpu();
+}
+void gbCPU_deinit(){
+	return;
+}
+
+static uint8_t CBPrefix() {
+	switch (gb_read(registers.pc)) {
+	case 0x00:		//RLC B
+	{
+		//Rotate B Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.b & 0b10000000);
+		setC(n);
+		registers.b <<= 1;
+		registers.b += n;
+		setZ(!(registers.b));
+		registers.pc++;
+		return 8;
+	}
+	case 0x01:		//RLC C
+	{
+		//Rotate C Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.c & 0b10000000);
+		setC(n);
+		registers.c <<= 1;
+		registers.c += n;
+		setZ(!(registers.c));
+		registers.pc++;
+		return 8;
+	}
+	case 0x02:		//RLC D
+	{
+		//Rotate D Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.d & 0b10000000);
+		setC(n);
+		registers.d <<= 1;
+		registers.d += n;
+		setZ(!(registers.d));
+		registers.pc++;
+		return 8;
+	}
+	case 0x03:		//RLC E
+	{
+		//Rotate E Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.e & 0b10000000);
+		setC(n);
+		registers.e <<= 1;
+		registers.e += n;
+		setZ(!(registers.e));
+		registers.pc++;
+		return 8;
+	}
+	case 0x04:		//RLC H
+	{
+		//Rotate H Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.h & 0b10000000);
+		setC(n);
+		registers.h <<= 1;
+		registers.h += n;
+		setZ(!(registers.h));
+		registers.pc++;
+		return 8;
+	}
+	case 0x05:		//RLC L
+	{
+		//Rotate L Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.l & 0b10000000);
+		setC(n);
+		registers.l <<= 1;
+		registers.l += n;
+		setZ(!(registers.l));
+		registers.pc++;
+		return 8;
+	}
+	case 0x06:		//RLC (HL)
+	{
+		//Rotate Data at HL Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		uint8_t hlData = gb_read(registers.hl);
+		bool n = (hlData &0b10000000);
+		setC(n);
+		hlData <<= 1;
+		hlData += n;
+		setZ(!(hlData));
+		gb_write(registers.hl, hlData);
+		registers.pc++;
+		return 8;
+	}
+	case 0x07:		//RLC A
+	{
+		//Rotate A Left, old bit 7 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.a & 0b10000000);
+		setC(n);
+		registers.a <<= 1;
+		registers.a += n;
+		setZ(!(registers.a));
+		registers.pc++;
+		return 8;
+	}
+	case 0x08:		//RRC B
+	{
+		//Rotate B right, old bit 0 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.b & 0b00000001);
+		setC(n);
+		registers.b >>= 1;
+		registers.b += ((uint8_t)n) << 7;
+		setZ(!(registers.b));
+		registers.pc++;
+		return 8;
+	}
+	case 0x09:		//RRC C
+	{
+		//Rotate C right, old bit 0 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.c & 0b00000001);
+		setC(n);
+		registers.c >>= 1;
+		registers.c += ((uint8_t)n) << 7;
+		setZ(!(registers.c));
+		registers.pc++;
+		return 8;
+	}
+	case 0x0A:		//RRC D
+	{
+		//Rotate D right, old bit 0 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.d & 0b00000001);
+		setC(n);
+		registers.d >>= 1;
+		registers.d += ((uint8_t)n) << 7;
+		setZ(!(registers.d));
+		registers.pc++;
+		return 8;
+	}
+	case 0x0B:		//RRC E
+	{
+		//Rotate E right, old bit 0 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.e & 0b00000001);
+		setC(n);
+		registers.e >>= 1;
+		registers.e += ((uint8_t)n) << 7;
+		setZ(!(registers.e));
+		registers.pc++;
+		return 8;
+	}
+	case 0x0C:		//RRC H
+	{
+		//Rotate H right, old bit 0 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.h & 0b00000001);
+		setC(n);
+		registers.h >>= 1;
+		registers.h += ((uint8_t)n) << 7;
+		setZ(!(registers.h));
+		registers.pc++;
+		return 8;
+	}
+	case 0x0D:		//RRC L
+	{
+		//Rotate L right, old bit 0 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.l & 0b00000001);
+		setC(n);
+		registers.l >>= 1;
+		registers.l += ((uint8_t)n) << 7;
+		setZ(!(registers.l));
+		registers.pc++;
+		return 8;
+	}
+	case 0x0E:		//RRC (HL)
+	{
+		//Rotate data in HL right, old bit 0 into carry flag
+		registers.f = 0x00;
+		uint8_t hlData = gb_read(registers.hl);
+		bool n = (hlData & 0b00000001);
+		setC(n);
+		hlData >>= 1;
+		hlData += ((uint8_t)n) << 7;
+		setZ(!(hlData));
+		gb_write(registers.hl, hlData);
+		registers.pc++;
+		return 8;
+	}
+	case 0x0F:		//RRC A
+	{
+		//Rotate A right, old bit 0 into carry flag
+		registers.f = 0x00;
+		bool n = (registers.a & 0b00000001);
+		setC(n);
+		registers.a >>= 1;
+		registers.a += ((uint8_t)n) << 7;
+		setZ(!(registers.a));
+		registers.pc++;
+		return 8;
+	}
+	case 0x10:		//RL B
+	{
+		//Rotate B left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.b & 0x80);
+		registers.b <<= 1;
+		registers.b += n;
+		setZ(!registers.b);
+		registers.pc++;
+		return 8;
+	}
+	case 0x11:		//RL C
+	{
+		//Rotate C left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.c & 0x80);
+		registers.c <<= 1;
+		registers.c += n;
+		setZ(!registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0x12:		//RL D
+	{
+		//Rotate D left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.d & 0x80);
+		registers.d <<= 1;
+		registers.d += n;
+		setZ(!registers.d);
+		registers.pc++;
+		return 8;
+	}
+	case 0x13:		//RL E
+	{
+		//Rotate E left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.e & 0x80);
+		registers.e <<= 1;
+		registers.e += n;
+		setZ(!registers.e);
+		registers.pc++;
+		return 8;
+	}
+	case 0x14:		//RL H
+	{
+		//Rotate H left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.h & 0x80);
+		registers.h <<= 1;
+		registers.h += n;
+		setZ(!registers.h);
+		registers.pc++;
+		return 8;
+	}
+	case 0x15:		//RL L
+	{
+		//Rotate L left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.l & 0x80);
+		registers.l <<= 1;
+		registers.l += n;
+		setZ(!registers.l);
+		registers.pc++;
+		return 8;
+	}
+	case 0x16:		//RL (HL)
+	{
+		//Rotate Data at HL left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		uint8_t hlData = gb_read(registers.hl);
+		setC(hlData & 0x80);
+		hlData <<= 1;
+		hlData += n;
+		setZ(!hlData);
+		gb_write(registers.hl, hlData);
+		registers.pc++;
+		return 8;
+	}
+	case 0x17:		//RL A
+	{
+		//Rotate A Left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.a & 0x80);
+		registers.a <<= 1;
+		registers.a += n;
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x18:		//RR B
+	{
+		//Rotate B right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.b & 0x01);
+		registers.b >>= 1;
+		registers.b += (((uint8_t)n) << 7);
+		setZ(!registers.b);
+		registers.pc++;
+		return 8;
+	}
+	case 0x19:		//RR C
+	{
+		//Rotate C right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.c & 0x01);
+		registers.c >>= 1;
+		registers.c += (((uint8_t)n)<<7);
+		setZ(!registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0x1A:		//RR D
+	{
+		//Rotate D right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.d & 0x01);
+		registers.d >>= 1;
+		registers.d += (((uint8_t)n) << 7);
+		setZ(!registers.d);
+		registers.pc++;
+		return 8;
+	}
+	case 0x1B:		//RR E
+	{
+		//Rotate E right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.e & 0x01);
+		registers.e >>= 1;
+		registers.e += (((uint8_t)n) << 7);
+		setZ(!registers.e);
+		registers.pc++;
+		return 8;
+	}
+	case 0x1C:		//RR H
+	{
+		//Rotate H right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.h & 0x01);
+		registers.h >>= 1;
+		registers.h += (((uint8_t)n) << 7);
+		setZ(!registers.h);
+		registers.pc++;
+		return 8;
+	}
+	case 0x1D:		//RR L
+	{
+		//Rotate L right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.l & 0x01);
+		registers.l >>= 1;
+		registers.l += (((uint8_t)n) << 7);
+		setZ(!registers.l);
+		registers.pc++;
+		return 8;
+	}
+	case 0x1E:		//RR (HL)
+	{
+		//Rotate data at HL right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		uint8_t hlData = gb_read(registers.hl);
+		setC(hlData & 0x01);
+		hlData >>= 1;
+		hlData += (((uint8_t)n) << 7);
+		setZ(!hlData);
+		gb_write(registers.hl, hlData);
+		registers.pc++;
+		return 8;
+	}
+	case 0x1F:		//RR A
+	{
+		//Rotate A right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.a & 0x01);
+		registers.a>>= 1;
+		registers.a += (((uint8_t)n) << 7);
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x20:		//SLA B
+	{
+		//Shift B Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		setC(registers.b & 0x80);
+		registers.b <<= 1;
+		setZ(!registers.b);
+		registers.pc++;
+		return 8;
+	}
+	case 0x21:		//SLA C
+	{
+		//Shift C Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		setC(registers.c & 0x80);
+		registers.c <<= 1;
+		setZ(!registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0x22:		//SLA D
+	{
+		//Shift D Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		setC(registers.d & 0x80);
+		registers.d <<= 1;
+		setZ(!registers.d);
+		registers.pc++;
+		return 8;
+	}
+	case 0x23:		//SLA E
+	{
+		//Shift E Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		setC(registers.e & 0x80);
+		registers.e <<= 1;
+		setZ(!registers.e);
+		registers.pc++;
+		return 8;
+	}
+	case 0x24:		//SLA H
+	{
+		//Shift H Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		setC(registers.h & 0x80);
+		registers.h <<= 1;
+		setZ(!registers.h);
+		registers.pc++;
+		return 8;
+	}
+	case 0x25:		//SLA L
+	{
+		//Shift L Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		setC(registers.l & 0x80);
+		registers.l <<= 1;
+		setZ(!registers.l);
+		registers.pc++;
+		return 8;
+	}
+	case 0x26:		//SLA (HL)
+	{
+		//Shift data at HL Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		uint8_t hlData = gb_read(registers.hl);
+		setC(hlData & 0x80);
+		hlData <<= 1;
+		gb_write(registers.hl, hlData);
+		setZ(!hlData);
+		registers.pc++;
+		return 8;
+	}
+	case 0x27:		//SLA A
+	{
+		//Shift A Left, into carry, LSB is 0;
+		registers.f = 0x00;
+		setC(registers.a & 0x80);
+		registers.a <<= 1;
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x28:		//SRA B
+	{
+		//Shift B Right, into carry, MSB is Unchanged;
+		registers.f = 0x00;
+		setC(registers.b & 0x01);
+		registers.b = ((registers.b & 0xFE) >> 1) + (registers.b & 0x80);
+		setZ(!registers.b);
+		registers.pc++;
+		return 8;
+	}
+	case 0x29:		//SRA C
+	{
+		//Shift C Right, into carry, MSB is Unchanged;
+		registers.f = 0x00;
+		setC(registers.c & 0x01);
+		registers.c = ((registers.c & 0xFE) >> 1) + (registers.c & 0x80);
+		setZ(!registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0x2A:		//SRA D
+	{
+		//Shift D Right, into carry, MSB is Unchanged;
+		registers.f = 0x00;
+		setC(registers.d & 0x01);
+		registers.d = ((registers.d & 0xFE) >> 1) + (registers.d & 0x80);
+		setZ(!registers.d);
+		registers.pc++;
+		return 8;
+	}
+	case 0x2B:		//SRA E
+	{
+		//Shift E Right, into carry, MSB is Unchanged
+		registers.f = 0x00;
+		setC(registers.e & 0x01);
+		registers.e = ((registers.e & 0xFE) >> 1) + (registers.e & 0x80);
+		setZ(!registers.e);
+		registers.pc++;
+		return 8;
+	}
+	case 0x2C:		//SRA H
+	{
+		//Shift h Right, into carry, MSB is Unchanged
+		registers.f = 0x00;
+		setC(registers.h & 0x01);
+		registers.h = ((registers.h & 0xFE) >> 1) + (registers.h & 0x80);
+		setZ(!registers.h);
+		registers.pc++;
+		return 8;
+	}
+	case 0x2D:		//SRA L
+	{
+		//Shift L Right, into carry, MSB is Unchanged
+		registers.f = 0x00;
+		setC(registers.l & 0x01);
+		registers.l = ((registers.l & 0xFE) >> 1) + (registers.l & 0x80);
+		setZ(!registers.l);
+		registers.pc++;
+		return 8;
+	}
+	case 0x2E:		//SRA (HL)
+	{
+		//Shift data at HL Right, into carry, MSB is Unchanged
+		registers.f = 0x00;
+		uint8_t hlData = gb_read(registers.hl);
+		setC(hlData & 0x01);
+		hlData = ((hlData & 0xFE) >> 1) + (hlData & 0x80);
+		gb_write(registers.hl, hlData);
+		setZ(!hlData);
+		registers.pc++;
+		return 8;
+	}
+	case 0x2F:		//SRA A
+	{
+		//Shift A Right, into carry, MSB is Unchanged
+		registers.f = 0x00;
+		setC(registers.a & 0x01);
+		registers.a = ((registers.a & 0xFE) >> 1) + (registers.a & 0x80);
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x30:		//SWAP B
+	{
+		//Swap Upper and Lower Nibbles of B
+		registers.f = 0b00000000;
+		registers.b = (registers.b << 4) + (registers.b >> 4);
+		setZ(!registers.b);
+		registers.pc++;
+		return 8;
+	}
+	case 0x31:		//SWAP C
+	{
+		//Swap Upper and Lower Nibbles of C
+		registers.f = 0b00000000;
+		registers.c = (registers.c << 4) + (registers.c >> 4);
+		setZ(!registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0x32:		//SWAP D
+	{
+		//Swap Upper and Lower Nibbles of D
+		registers.f = 0b00000000;
+		registers.d = (registers.d << 4) + (registers.d >> 4);
+		setZ(!registers.d);
+		registers.pc++;
+		return 8;
+	}
+	case 0x33:		//SWAP E
+	{
+		//Swap Upper and Lower Nibbles of E
+		registers.f = 0b00000000;
+		registers.e = (registers.e << 4) + (registers.e >> 4);
+		setZ(!registers.e);
+		registers.pc++;
+		return 8;
+	}
+	case 0x34:		//SWAP H
+	{
+		//Swap Upper and Lower Nibbles of H
+		registers.f = 0b00000000;
+		registers.h = (registers.h << 4) + (registers.h >> 4);
+		setZ(!registers.h);
+		registers.pc++;
+		return 8;
+	}
+	case 0x35:		//SWAP L
+	{
+		//Swap Upper and Lower Nibbles of L
+		registers.f = 0b00000000;
+		registers.l = (registers.l << 4) + (registers.l >> 4);
+		setZ(!registers.l);
+		registers.pc++;
+		return 8;
+	}
+	case 0x36:		//SWAP (HL)
+	{
+		//Swap Upper and Lower Nibbles of A
+		uint8_t hlData = gb_read(registers.hl);
+		registers.f = 0b00000000;
+		gb_write(registers.hl, (hlData << 4) + (hlData >> 4));
+		setZ(!hlData);
+		registers.pc++;
+		return 16;
+	}
+	case 0x37:		//SWAP A
+	{
+		//Swap Upper and Lower Nibbles of A
+		registers.f = 0b00000000;
+		registers.a = (registers.a << 4) + (registers.a >> 4);
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x38:		//SRL B
+	{
+		//Shift B Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		setC(registers.b & 0x01);
+		registers.b >>= 1;
+		setZ(!registers.b);
+		registers.pc++;
+		return 8;
+	}
+	case 0x39:		//SRL C
+	{
+		//Shift C Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		setC(registers.c & 0x01);
+		registers.c >>= 1;
+		setZ(!registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0x3A:		//SRL D
+	{
+		//Shift D Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		setC(registers.d & 0x01);
+		registers.d >>= 1;
+		setZ(!registers.d);
+		registers.pc++;
+		return 8;
+	}
+	case 0x3B:		//SRL E
+	{
+		//Shift E Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		setC(registers.e & 0x01);
+		registers.e >>= 1;
+		setZ(!registers.e);
+		registers.pc++;
+		return 8;
+	}
+	case 0x3C:		//SRL H
+	{
+		//Shift h Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		setC(registers.h & 0x01);
+		registers.h >>= 1;
+		setZ(!registers.h);
+		registers.pc++;
+		return 8;
+	}
+	case 0x3D:		//SRL L
+	{
+		//Shift L Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		setC(registers.l & 0x01);
+		registers.l >>= 1;
+		setZ(!registers.l);
+		registers.pc++;
+		return 8;
+	}
+	case 0x3E:		//SRL (HL)
+	{
+		//Shift data at HL Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		uint8_t hlData = gb_read(registers.hl);
+		setC(hlData & 0x01);
+		hlData >>= 1;
+		gb_write(registers.hl, hlData);
+		setZ(!hlData);
+		registers.pc++;
+		return 8;
+	}
+	case 0x3F:		//SRL A
+	{
+		//Shift A Right, into carry, MSB is 0;
+		registers.f = 0x00;
+		setC(registers.a & 0x01);
+		registers.a >>= 1;
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x40:		//BIT 0, B
+	{
+		//test bit 0 in B register
+		setZ(!(registers.b & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x41:		//BIT 0, C
+	{
+		//test bit 0 in C register
+		setZ(!(registers.c & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x42:		//BIT 0, D
+	{
+		//test bit 0 in D register
+		setZ(!(registers.d & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x43:		//BIT 0, E
+	{
+		//test bit 0 in E register
+		setZ(!(registers.e & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x44:		//BIT 0, H
+	{
+		//test bit 0 in H register
+		setZ(!(registers.h & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x45:		//BIT 0, L
+	{
+		//test bit 0 in L register
+		setZ(!(registers.l & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x46:		//BIT 0, (HL)
+	{
+		//test bit 0 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x47:		//BIT 0, A
+	{
+		//test bit 0 in A register
+		setZ(!(registers.a & 0b00000001));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x48:		//BIT 1, B
+	{
+		//test bit 1 in B register
+		setZ(!(registers.b & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x49:		//BIT 1, C
+	{
+		//test bit 1 in C register
+		setZ(!(registers.c & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x4A:		//BIT 1, D
+	{
+		//test bit 1 in D register
+		setZ(!(registers.d & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x4B:		//BIT 1, E
+	{
+		//test bit 1 in E register
+		setZ(!(registers.e & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x4C:		//BIT 1, H
+	{
+		//test bit 1 in H register
+		setZ(!(registers.h & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x4D:		//BIT 1, L
+	{
+		//test bit 1 in L register
+		setZ(!(registers.l & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x4E:		//BIT 1, (HL)
+	{
+		//test bit 1 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x4F:		//BIT 1, A
+	{
+		//test bit 1 in A register
+		setZ(!(registers.a & 0b00000010));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x50:		//BIT 2, B
+	{
+		//test bit 2 in B register
+		setZ(!(registers.b & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x51:		//BIT 2, C
+	{
+		//test bit 2 in C register
+		setZ(!(registers.c & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x52:		//BIT 2, D
+	{
+		//test bit 2 in D register
+		setZ(!(registers.d & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x53:		//BIT 2, E
+	{
+		//test bit 2 in E register
+		setZ(!(registers.e & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x54:		//BIT 2, H
+	{
+		//test bit 2 in H register
+		setZ(!(registers.h & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x55:		//BIT 2, L
+	{
+		//test bit 2 in L register
+		setZ(!(registers.l & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x56:		//BIT 2, (HL)
+	{
+		//test bit 2 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x57:		//BIT 2, A
+	{
+		//test bit 2 in A register
+		setZ(!(registers.a & 0b00000100));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x58:		//BIT 3, B
+	{
+		//test bit 3 in B register
+		setZ(!(registers.b & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x59:		//BIT 3, C
+	{
+		//test bit 3 in C register
+		setZ(!(registers.c & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x5A:		//BIT 3, D
+	{
+		//test bit 3 in D register
+		setZ(!(registers.d & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x5B:		//BIT 3, E
+	{
+		//test bit 3 in E register
+		setZ(!(registers.e & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x5C:		//BIT 3, H
+	{
+		//test bit 3 in H register
+		setZ(!(registers.h & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x5D:		//BIT 3, L
+	{
+		//test bit 3 in L register
+		setZ(!(registers.l & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x5E:		//BIT 3, (HL)
+	{
+		//test bit 3 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x5F:		//BIT 3, A
+	{
+		//test bit 3 in A register
+		setZ(!(registers.a & 0b00001000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x60:		//BIT 4, B
+	{
+		//test bit 4 in B register
+		setZ(!(registers.b & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x61:		//BIT 4, C
+	{
+		//test bit 4 in C register
+		setZ(!(registers.c & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x62:		//BIT 4, D
+	{
+		//test bit 4 in D register
+		setZ(!(registers.d & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x63:		//BIT 4, E
+	{
+		//test bit 4 in E register
+		setZ(!(registers.e & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x64:		//BIT 4, H
+	{
+		//test bit 4 in H register
+		setZ(!(registers.h & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x65:		//BIT 4, L
+	{
+		//test bit 4 in L register
+		setZ(!(registers.l & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x66:		//BIT 4, (HL)
+	{
+		//test bit 4 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x67:		//BIT 4, A
+	{
+		//test bit 4 in A register
+		setZ(!(registers.a & 0b00010000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x68:		//BIT 5, B
+	{
+		//test bit 5 in B register
+		setZ(!(registers.b & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x69:		//BIT 5, C
+	{
+		//test bit 5 in C register
+		setZ(!(registers.c & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x6A:		//BIT 5, D
+	{
+		//test bit 5 in D register
+		setZ(!(registers.d & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x6B:		//BIT 5, E
+	{
+		//test bit 5 in E register
+		setZ(!(registers.e & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x6C:		//BIT 5, H
+	{
+		//test bit 5 in H register
+		setZ(!(registers.h & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x6D:		//BIT 5, L
+	{
+		//test bit 5 in L register
+		setZ(!(registers.l & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x6E:		//BIT 5, (HL)
+	{
+		//test bit 5 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x6F:		//BIT 5, A
+	{
+		//test bit 5 in A register
+		setZ(!(registers.a & 0b00100000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x70:		//BIT 6, B
+	{
+		//test bit 6 in B register
+		setZ(!(registers.b & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x71:		//BIT 6, C
+	{
+		//test bit 6 in C register
+		setZ(!(registers.c & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x72:		//BIT 6, D
+	{
+		//test bit 6 in D register
+		setZ(!(registers.d & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x73:		//BIT 6, E
+	{
+		//test bit 6 in E register
+		setZ(!(registers.e & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x74:		//BIT 6, H
+	{
+		//test bit 6 in H register
+		setZ(!(registers.h & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x75:		//BIT 6, L
+	{
+		//test bit 6 in L register
+		setZ(!(registers.l & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x76:		//BIT 6, (HL)
+	{
+		//test bit 6 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x77:		//BIT 6, A
+	{
+		//test bit 6 in A register
+		setZ(!(registers.a & 0b01000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x78:		//BIT 7, B
+	{
+		//test bit 7 in B register
+		setZ(!(registers.b & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x79:		//BIT 7, C
+	{
+		//test bit 7 in C register
+		setZ(!(registers.c & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x7A:		//BIT 7, D
+	{
+		//test bit 7 in D register
+		setZ(!(registers.d & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x7B:		//BIT 7, E
+	{
+		//test bit 7 in E register
+		setZ(!(registers.e & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x7C:		//BIT 7, H
+	{
+		//test bit 7 in H register
+		setZ(!(registers.h & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x7D:		//BIT 7, L
+	{
+		//test bit 7 in L register
+		setZ(!(registers.l & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x7E:		//BIT 7, (HL)
+	{
+		//test bit 7 in data at address HL
+		setZ(!(gb_read(registers.hl) & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x7F:		//BIT 7, A
+	{
+		//test bit 7 in A register
+		setZ(!(registers.a & 0b10000000));
+		setN(0);
+		setH(1);
+		registers.pc++;
+		return 8;
+	}
+	case 0x80:		//RES 0, B
+	{
+		//reset bit 0 in register B
+		registers.b &= 0b11111110;
+		registers.pc++;
+		return 8;
+	}
+	case 0x81:		//RES 0, C
+	{
+		//reset bit 0 in register C
+		registers.c &= 0b11111110;
+		registers.pc++;
+		return 8;
+	}
+	case 0x82:		//RES 0, D
+	{
+		//reset bit 0 in register D
+		registers.d &= 0b11111110;
+		registers.pc++;
+		return 8;
+	}
+	case 0x83:		//RES 0, E
+	{
+		//reset bit 0 in register E
+		registers.e &= 0b11111110;
+		registers.pc++;
+		return 8;
+	}
+	case 0x84:		//RES 0, H
+	{
+		//reset bit 0 in register H
+		registers.h &= 0b11111110;
+		registers.pc++;
+		return 8;
+	}
+	case 0x85:		//RES 0, L
+	{
+		//reset bit 0 in register L
+		registers.l &= 0b11111110;
+		registers.pc++;
+		return 8;
+	}
+	case 0x86:		//RES 0, (HL)
+	{
+		//reset bit 0 in register (HL)
+		gb_andWrite(registers.hl, 0b11111110);
+		registers.pc++;
+		return 16;
+	}
+	case 0x87:		//RES 0, A
+	{
+		//reset bit 0 in register A
+		registers.a &= 0b11111110;
+		registers.pc++;
+		return 8;
+	}
+	case 0x88:		//RES 1, B
+	{
+		//reset bit 1 in register B
+		registers.b &= 0b11111101;
+		registers.pc++;
+		return 8;
+	}
+	case 0x89:		//RES 1, C
+	{
+		//reset bit 1 in register C
+		registers.c &= 0b11111101;
+		registers.pc++;
+		return 8;
+	}
+	case 0x8A:		//RES 1, D
+	{
+		//reset bit 1 in register D
+		registers.d &= 0b11111101;
+		registers.pc++;
+		return 8;
+	}
+	case 0x8B:		//RES 1, E
+	{
+		//reset bit 1 in register E
+		registers.e &= 0b11111101;
+		registers.pc++;
+		return 8;
+	}
+	case 0x8C:		//RES 1, H
+	{
+		//reset bit 1 in register H
+		registers.h &= 0b11111101;
+		registers.pc++;
+		return 8;
+	}
+	case 0x8D:		//RES 1, L
+	{
+		//reset bit 1 in register L
+		registers.l &= 0b11111101;
+		registers.pc++;
+		return 8;
+	}
+	case 0x8E:		//RES 1, (HL)
+	{
+		//reset bit 1 in register (HL)
+		gb_andWrite(registers.hl, 0b11111101);
+		registers.pc++;
+		return 16;
+	}
+	case 0x8F:		//RES 1, A
+	{
+		//reset bit 1 in register A
+		registers.a &= 0b11111101;
+		registers.pc++;
+		return 8;
+	}
+	case 0x90:		//RES 2, B
+	{
+		//reset bit 2 in register B
+		registers.b &= 0b11111011;
+		registers.pc++;
+		return 8;
+	}
+	case 0x91:		//RES 2, C
+	{
+		//reset bit 2 in register C
+		registers.c &= 0b11111011;
+		registers.pc++;
+		return 8;
+	}
+	case 0x92:		//RES 2, D
+	{
+		//reset bit 2 in register D
+		registers.d &= 0b11111011;
+		registers.pc++;
+		return 8;
+	}
+	case 0x93:		//RES 2, E
+	{
+		//reset bit 2 in register E
+		registers.e &= 0b11111011;
+		registers.pc++;
+		return 8;
+	}
+	case 0x94:		//RES 2, H
+	{
+		//reset bit 2 in register H
+		registers.h &= 0b11111011;
+		registers.pc++;
+		return 8;
+	}
+	case 0x95:		//RES 2, L
+	{
+		//reset bit 2 in register L
+		registers.l &= 0b11111011;
+		registers.pc++;
+		return 8;
+	}
+	case 0x96:		//RES 2, (HL)
+	{
+		//reset bit 2 in register (HL)
+		gb_andWrite(registers.hl, 0b11111011);
+		registers.pc++;
+		return 16;
+	}
+	case 0x97:		//RES 2, A
+	{
+		//reset bit 2 in register A
+		registers.a &= 0b11111011;
+		registers.pc++;
+		return 8;
+	}
+	case 0x98:		//RES 3, B
+	{
+		//reset bit 3 in register B
+		registers.b &= 0b11110111;
+		registers.pc++;
+		return 8;
+	}
+	case 0x99:		//RES 3, C
+	{
+		//reset bit 3 in register C
+		registers.c &= 0b11110111;
+		registers.pc++;
+		return 8;
+	}
+	case 0x9A:		//RES 3, D
+	{
+		//reset bit 3 in register D
+		registers.d &= 0b11110111;
+		registers.pc++;
+		return 8;
+	}
+	case 0x9B:		//RES 3, E
+	{
+		//reset bit 3 in register E
+		registers.e &= 0b11110111;
+		registers.pc++;
+		return 8;
+	}
+	case 0x9C:		//RES 3, H
+	{
+		//reset bit 3 in register H
+		registers.h &= 0b11110111;
+		registers.pc++;
+		return 8;
+	}
+	case 0x9D:		//RES 3, L
+	{
+		//reset bit 3 in register L
+		registers.l &= 0b11110111;
+		registers.pc++;
+		return 8;
+	}
+	case 0x9E:		//RES 3, (HL)
+	{
+		//reset bit 3 in register (HL)
+		gb_andWrite(registers.hl, 0b11110111);
+		registers.pc++;
+		return 16;
+	}
+	case 0x9F:		//RES 3, A
+	{
+		//reset bit 3 in register A
+		registers.a &= 0b11110111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA0:		//RES 4, B
+	{
+		//reset bit 4 in register B
+		registers.b &= 0b11101111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA1:		//RES 4, C
+	{
+		//reset bit 4 in register C
+		registers.c &= 0b11101111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA2:		//RES 4, D
+	{
+		//reset bit 4 in register D
+		registers.d &= 0b11101111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA3:		//RES 4, E
+	{
+		//reset bit 4 in register E
+		registers.e &= 0b11101111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA4:		//RES 4, H
+	{
+		//reset bit 4 in register H
+		registers.h &= 0b11101111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA5:		//RES 4, L
+	{
+		//reset bit 4 in register L
+		registers.l &= 0b11101111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA6:		//RES 4, (HL)
+	{
+		//reset bit 4 in register (HL)
+		gb_andWrite(registers.hl, 0b11101111);
+		registers.pc++;
+		return 16;
+	}
+	case 0xA7:		//RES 4, A
+	{
+		//reset bit 4 in register A
+		registers.a &= 0b11101111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA8:		//RES 5, B
+	{
+		//reset bit 5 in register B
+		registers.b &= 0b11011111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xA9:		//RES 5, C
+	{
+		//reset bit 5 in register C
+		registers.c &= 0b11011111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xAA:		//RES 5, D
+	{
+		//reset bit 5 in register D
+		registers.d &= 0b11011111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xAB:		//RES 5, E
+	{
+		//reset bit 5 in register E
+		registers.e &= 0b11011111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xAC:		//RES 5, H
+	{
+		//reset bit 5 in register H
+		registers.h &= 0b11011111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xAD:		//RES 5, L
+	{
+		//reset bit 5 in register L
+		registers.l &= 0b11011111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xAE:		//RES 5, (HL)
+	{
+		//reset bit 5 in register (HL)
+		gb_andWrite(registers.hl, 0b11011111);
+		registers.pc++;
+		return 16;
+	}
+	case 0xAF:		//RES 5, A
+	{
+		//reset bit 5 in register A
+		registers.a &= 0b11011111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB0:		//RES 6, B
+	{
+		//reset bit 6 in register B
+		registers.b &= 0b10111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB1:		//RES 6, C
+	{
+		//reset bit 6 in register C
+		registers.c &= 0b10111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB2:		//RES 6, D
+	{
+		//reset bit 6 in register D
+		registers.d &= 0b10111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB3:		//RES 6, E
+	{
+		//reset bit 6 in register E
+		registers.e &= 0b10111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB4:		//RES 6, H
+	{
+		//reset bit 6 in register H
+		registers.h &= 0b10111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB5:		//RES 6, L
+	{
+		//reset bit 6 in register L
+		registers.l &= 0b10111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB6:		//RES 6, (HL)
+	{
+		//reset bit 6 in register (HL)
+		gb_andWrite(registers.hl, 0b10111111);
+		registers.pc++;
+		return 16;
+	}
+	case 0xB7:		//RES 6, A
+	{
+		//reset bit 6 in register A
+		registers.a &= 0b10111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB8:		//RES 7, B
+	{
+		//reset bit 7 in register B
+		registers.b &= 0b01111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xB9:		//RES 7, C
+	{
+		//reset bit 3 in register C
+		registers.c &= 0b01111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xBA:		//RES 7, D
+	{
+		//reset bit 7 in register D
+		registers.d &= 0b01111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xBB:		//RES 7, E
+	{
+		//reset bit 7 in register E
+		registers.e &= 0b01111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xBC:		//RES 7, H
+	{
+		//reset bit 7 in register H
+		registers.h &= 0b01111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xBD:		//RES 7, L
+	{
+		//reset bit 7 in register L
+		registers.l &= 0b01111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xBE:		//RES 7, (HL)
+	{
+		//reset bit 7 in register (HL)
+		gb_andWrite(registers.hl, 0b01111111);
+		registers.pc++;
+		return 16;
+	}
+	case 0xBF:		//RES 7, A
+	{
+		//reset bit 7 in register A
+		registers.a &= 0b01111111;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC0:		//SET 0, B
+	{
+		//set bit 0 in register B
+		registers.b |= 0b00000001;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC1:		//SET 0, C
+	{
+		//set bit 0 in register C
+		registers.c |= 0b00000001;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC2:		//SET 0, D
+	{
+		//set bit 0 in register D
+		registers.d |= 0b00000001;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC3:		//SET 0, E
+	{
+		//set bit 0 in register E
+		registers.e |= 0b00000001;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC4:		//SET 0, H
+	{
+		//set bit 0 in register H
+		registers.h |= 0b00000001;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC5:		//SET 0, L
+	{
+		//set bit 0 in register L
+		registers.l |= 0b00000001;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC6:		//SET 0, (HL)
+	{
+		//set bit 0 in register (HL)
+		gb_orWrite(registers.hl, 0b00000001);
+		registers.pc++;
+		return 16;
+	}
+	case 0xC7:		//SET 0, A
+	{
+		//set bit 0 in register A
+		registers.a |= 0b00000001;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC8:		//SET 1, B
+	{
+		//set bit 1 in register B
+		registers.b |= 0b00000010;
+		registers.pc++;
+		return 8;
+	}
+	case 0xC9:		//SET 1, C
+	{
+		//set bit 1 in register C
+		registers.c |= 0b00000010;
+		registers.pc++;
+		return 8;
+	}
+	case 0xCA:		//SET 1, D
+	{
+		//set bit 1 in register D
+		registers.d |= 0b00000010;
+		registers.pc++;
+		return 8;
+	}
+	case 0xCB:		//SET 1, E
+	{
+		//set bit 1 in register E
+		registers.e |= 0b00000010;
+		registers.pc++;
+		return 8;
+	}
+	case 0xCC:		//SET 1, H
+	{
+		//set bit 1 in register H
+		registers.h |= 0b00000010;
+		registers.pc++;
+		return 8;
+	}
+	case 0xCD:		//SET 1, L
+	{
+		//set bit 1 in register L
+		registers.l |= 0b00000010;
+		registers.pc++;
+		return 8;
+	}
+	case 0xCE:		//SET 1, (HL)
+	{
+		//set bit 1 in register (HL)
+		gb_orWrite(registers.hl, 0b00000010);
+		registers.pc++;
+		return 16;
+	}
+	case 0xCF:		//SET 1, A
+	{
+		//set bit 1 in register A
+		registers.a |= 0b00000010;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD0:		//SET 2, B
+	{
+		//set bit 2 in register B
+		registers.b |= 0b00000100;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD1:		//SET 2, C
+	{
+		//set bit 2 in register C
+		registers.c |= 0b00000100;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD2:		//SET 2, D
+	{
+		//set bit 2 in register D
+		registers.d |= 0b00000100;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD3:		//SET 2, E
+	{
+		//set bit 2 in register E
+		registers.e |= 0b00000100;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD4:		//SET 2, H
+	{
+		//set bit 2 in register H
+		registers.h |= 0b00000100;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD5:		//SET 2, L
+	{
+		//set bit 2 in register L
+		registers.l |= 0b00000100;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD6:		//SET 2, (HL)
+	{
+		//set bit 2 in register (HL)
+		gb_orWrite(registers.hl, 0b00000100);
+		registers.pc++;
+		return 16;
+	}
+	case 0xD7:		//SET 2, A
+	{
+		//set bit 2 in register A
+		registers.a |= 0b00000100;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD8:		//SET 3, B
+	{
+		//set bit 3 in register B
+		registers.b |= 0b00001000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xD9:		//SET 3, C
+	{
+		//set bit 3 in register C
+		registers.c |= 0b00001000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xDA:		//SET 3, D
+	{
+		//set bit 3 in register D
+		registers.d |= 0b00001000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xDB:		//SET 3, E
+	{
+		//set bit 3 in register E
+		registers.e |= 0b00001000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xDC:		//SET 3, H
+	{
+		//set bit 3 in register H
+		registers.h |= 0b00001000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xDD:		//SET 3, L
+	{
+		//set bit 3 in register L
+		registers.l |= 0b00001000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xDE:		//SET 3, (HL)
+	{
+		//set bit 3 in register (HL)
+		gb_orWrite(registers.hl, 0b00001000);
+		registers.pc++;
+		return 16;
+	}
+	case 0xDF:		//SET 3, A
+	{
+		//set bit 3 in register A
+		registers.a |= 0b00001000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE0:		//SET 4, B
+	{
+		//set bit 4 in register B
+		registers.b |= 0b00010000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE1:		//SET 4, C
+	{
+		//set bit 4 in register C
+		registers.c |= 0b00010000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE2:		//SET 4, D
+	{
+		//set bit 4 in register D
+		registers.d |= 0b00010000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE3:		//SET 4, E
+	{
+		//set bit 4 in register E
+		registers.e |= 0b00010000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE4:		//SET 4, H
+	{
+		//set bit 4 in register H
+		registers.h |= 0b00010000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE5:		//SET 4, L
+	{
+		//set bit 4 in register L
+		registers.l |= 0b00010000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE6:		//SET 4, (HL)
+	{
+		//set bit 4 in register (HL)
+		gb_orWrite(registers.hl, 0b00010000);
+		registers.pc++;
+		return 16;
+	}
+	case 0xE7:		//SET 4, A
+	{
+		//set bit 4 in register A
+		registers.a |= 0b00010000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE8:		//SET 5, B
+	{
+		//set bit 5 in register B
+		registers.b |= 0b00100000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xE9:		//SET 5, C
+	{
+		//set bit 5 in register C
+		registers.c |= 0b00100000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xEA:		//SET 5, D
+	{
+		//set bit 5 in register D
+		registers.d |= 0b00100000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xEB:		//SET 5, E
+	{
+		//set bit 5 in register E
+		registers.e |= 0b00100000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xEC:		//SET 5, H
+	{
+		//set bit 5 in register H
+		registers.h |= 0b00100000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xED:		//SET 5, L
+	{
+		//set bit 5 in register L
+		registers.l |= 0b00100000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xEE:		//SET 5, (HL)
+	{
+		//set bit 5 in register (HL)
+		gb_orWrite(registers.hl, 0b00100000);
+		registers.pc++;
+		return 16;
+	}
+	case 0xEF:		//SET 5, A
+	{
+		//set bit 5 in register A
+		registers.a |= 0b00100000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF0:		//SET 6, B
+	{
+		//set bit 6 in register B
+		registers.b |= 0b01000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF1:		//SET 6, C
+	{
+		//set bit 6 in register C
+		registers.c |= 0b01000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF2:		//SET 6, D
+	{
+		//set bit 6 in register D
+		registers.d |= 0b01000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF3:		//SET 6, E
+	{
+		//set bit 6 in register E
+		registers.e |= 0b01000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF4:		//SET 6, H
+	{
+		//set bit 6 in register H
+		registers.h |= 0b01000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF5:		//SET 6, L
+	{
+		//set bit 6 in register L
+		registers.l |= 0b01000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF6:		//SET 6, (HL)
+	{
+		//set bit 6 in register (HL)
+		gb_orWrite(registers.hl, 0b01000000);
+		registers.pc++;
+		return 16;
+	}
+	case 0xF7:		//SET 6, A
+	{
+		//set bit 6 in register A
+		registers.a |= 0b01000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF8:		//SET 7, B
+	{
+		//set bit 7 in register B
+		registers.b |= 0b10000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xF9:		//SET 7, C
+	{
+		//set bit 3 in register C
+		registers.c |= 0b10000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xFA:		//SET 7, D
+	{
+		//set bit 7 in register D
+		registers.d |= 0b10000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xFB:		//SET 7, E
+	{
+		//set bit 7 in register E
+		registers.e |= 0b10000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xFC:		//SET 7, H
+	{
+		//set bit 7 in register H
+		registers.h |= 0b10000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xFD:		//SET 7, L
+	{
+		//set bit 7 in register L
+		registers.l |= 0b10000000;
+		registers.pc++;
+		return 8;
+	}
+	case 0xFE:		//SET 7, (HL)
+	{
+		//set bit 7 in register (HL)
+		gb_orWrite(registers.hl, 0b10000000);
+		registers.pc++;
+		return 16;
+	}
+	case 0xFF:		//SET 7, A
+	{
+		//set bit 7 in register A
+		registers.a |= 0b10000000;
+		registers.pc++;
+		return 8;
+	}
+	default:
+	{
+		Failure(2);
+		return 0;
+	}
+	}
+}
+
+uint8_t gbCPU_instruction(){
+	if(halted){
+		return 4;
+	}
+	switch (gb_read(registers.pc)) {
+	case 0x00:      //NOP
+	{
+		registers.pc++;
+		return 4;
+	}
+	case 0x01:		//LD BC, nn
+	{
+		//load nn into BC
+		registers.pc++;
+		// registers.bc = gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8);
+		registers.bc = gb_read16(registers.pc);
+		registers.pc++;//count past the two parameters
+		registers.pc++;
+		return 12;
+	}
+	case 0x02:		//LD (BC), A
+	{
+		//Put A into memory at BC
+		gb_write(registers.bc, registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x03:      //INC BC
+	{
+		//Increments Register BC by 1
+		registers.bc++;
+		registers.pc++;
+		return 8;
+	}
+	case 0x04:		//INC B
+	{
+		//increment register B
+		registers.b++;
+		setN(0);
+		setH(registers.b % 16 == 0);
+		registers.pc++;
+		setZ(!registers.b);
+		return 4;
+	}
+	case 0x05:      //DEC B
+	{
+		//Decrement Register B
+		setN(1);
+		setH(!(registers.b & 0x0F));
+		registers.b--;
+		setZ(!registers.b);
+		registers.pc++;
+		return 4;
+	}
+	case 0x06:      //LD B, n
+	{
+	    //load n into b
+		registers.pc++;
+		registers.b = gb_read(registers.pc);
+		registers.pc++;//count past param
+		return 8;
+	}
+	case 0x07:		//RLCA
+	{
+		//Rotate A (circular) left. old bit 7 into C;
+		setN(0);
+		setH(0);
+		setC(registers.a&0x80);
+		registers.a = (registers.a&0x7F)<<1;
+		registers.a += (registers.f&0b00010000) >> 4;
+		setZ(0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x08:		//LD (nn),SP
+	{
+		//Put SP into memory at address nn
+		registers.pc++;
+		gb_write(gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8)	 , registers.sp & 0x00FF);
+		gb_write(gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8) + 1, (registers.sp & 0xFF00)>>8);
+		registers.pc++;//count past the two parameters
+		registers.pc++;
+		return 20;
+	}
+	case 0x09:		//ADD HL, BC
+	{
+		//Add BC to HL
+		setN(0);
+		setC(((int)registers.bc + (int)registers.hl) > 65535);
+		setH(((registers.bc & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
+		registers.hl = registers.hl + registers.bc;
+		registers.pc++;
+		return 8; 
+	}
+	case 0x0A:		//LD A, (BC)
+	{
+		//Load value at address (BC) into A
+		registers.a = gb_read(registers.bc);
+		registers.pc++;
+		return 8;
+	}
+	case 0x0B:		//DEC BC
+	{
+		//decrement register BC
+		registers.bc--;
+		registers.pc++;
+		return 8;
+	}
+	case 0x0C:		//INC C
+	{
+		//increment register C
+		registers.c++;
+		setN(0);
+		setZ(!registers.c);
+		setH(registers.c % 16 == 0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x0D:      //DEC C
+	{
+		//Decrement Register c
+		setH(!(registers.c & 0x0F));
+		registers.c--;
+		setZ(!registers.c);
+		setN(1);
+		registers.pc++;
+		return 4;
+	}
+	case 0x0E:      //LD C, n
+	{
+	  //load n into C
+		registers.c = gb_read(registers.pc + 1);
+		registers.pc++;//count past param
+		registers.pc++;
+		return 8;
+	}
+	case 0x0F:		//RRCA
+	{
+		//Rotate A Right, old bit 0 into carry flag
+		registers.f = 0x00;
+		uint8_t c = registers.a & 0b00000001;
+		setC(registers.a & 0b00000001);
+		registers.a >>= 1;
+		registers.a += ((uint8_t)c << 7);
+		setZ(0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x10:		//STOP
+	{
+		//Wait for Button Press
+		//Failure(1);
+		registers.pc++;
+		return 0;
+	}
+	case 0x11:		//LD DE, nn
+	{
+		//load nn into register DE
+		registers.pc++;
+		registers.de = (gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8));
+		registers.pc++;//count past the two parameters
+		registers.pc++;
+		return 12;
+	}
+	case 0x12:		//LD (DE), A
+	{
+		//load A into the address (DE)
+		gb_write(registers.de, registers.a);
+		registers.pc++;
+		return 12;
+	}
+	case 0x13:		//INC DE
+	{
+		//increment register DE
+		registers.de++;
+		registers.pc++;
+		return 8;
+	}
+	case 0x14:		//INC D
+	{
+		//increment register D
+		registers.d++;
+		setN(0);
+		setZ(!registers.d);
+		setH(registers.d % 16 == 0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x15:		//DEC D
+	{
+		//Decrement Register D
+		setH(!(registers.d & 0x0F));
+		registers.d--;
+		setZ(!registers.d);
+		setN(1);
+		registers.pc++;
+		return 4;
+	}
+	case 0x16:		//LD D, n
+	{
+		//load n into D
+		registers.pc++;
+		registers.d = gb_read(registers.pc);
+		registers.pc++;//count past param
+		return 8;
+	}
+	case 0x17:		//RLA
+	{
+		//Rotate A left through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.a & 0x80);
+		registers.a <<= 1;
+		registers.a += n;
+		setZ(0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x18:		//JR n
+	{
+		//jump to current address + n (signed)
+		registers.pc++;
+		registers.pc += ((signed char)gb_read(registers.pc));
+		registers.pc++;
+		return 12;
+	}
+	case 0x19:		//ADD HL, DE
+	{
+		//Add DE to HL
+		setN(0);
+		setC(((int)registers.de + (int)registers.hl) > 65535);
+		setH(((registers.de & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
+		registers.hl += registers.de;
+		registers.pc++;
+		return 8;
+	}
+	case 0x1A:		//LD A, (DE)
+	{
+		//Load value at (DE) into A
+		registers.a = gb_read(registers.de);
+		registers.pc++;
+		return 8;
+	}
+	case 0x1B:		//DEC DE
+	{
+		//decrement register DE
+		registers.de--;
+		registers.pc++;
+		return 8;
+	}
+	case 0x1C:		//INC E
+	{
+		//increment register E
+		registers.e++;
+		setN(0);
+		setH(registers.e % 16 == 0);
+		setZ(!registers.e);
+		registers.pc++;
+		return 4;
+	}
+	case 0x1D:		//DEC E
+	{
+		//Decrement Register E
+		setH(!(registers.e & 0x0F));
+		registers.e--;
+		setZ(!registers.e);
+		setN(1);
+		registers.pc++;
+		return 4;
+	}
+	case 0x1E:		//LD E, n
+	{
+		//load n into E
+		registers.pc++;
+		registers.e = gb_read(registers.pc);
+		registers.pc++;//count past param
+		return 8;
+	}
+	case 0x1F:		//RRA
+	{
+		//Rotate A Right through Carry Flag
+		bool n = (registers.f & CMASK);
+		registers.f = 0x00;
+		setC(registers.a & 0x01);
+		registers.a >>= 1;
+		registers.a += ((int)n)<<7;
+		setZ(0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x20:      //JR NZ, n
+	{
+	  //jump to current address plus n if Zflag is reset 
+		if (!(registers.f & ZMASK)) {
+			registers.pc++;
+			registers.pc += ((signed char)gb_read(registers.pc)); //forces twos complement
+			registers.pc++;
+			return 12;
+		}
+		else {
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0x21:      //LD HL, nn
+	{
+	  //put value nn into HL, LSByte first
+		registers.pc++;
+		registers.hl = (gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8));
+		registers.pc++;//count past the two parameters
+		registers.pc++;
+		return 12;
+	}
+	case 0x22:		//LDI (HL), A
+	{
+		//put memory in A into memory address HL, increment HL.
+		gb_write(registers.hl, registers.a);
+		registers.hl++;
+		registers.pc++;
+		return 8;
+	}
+	case 0x23:		//INC HL
+	{
+		//increment register HL
+		registers.hl++;
+		registers.pc++;
+		return 8;
+	}
+	case 0x24:		//INC H
+	{
+		//increment register H
+		registers.h++;
+		setN(0);
+		setH(registers.h % 16 == 0);
+		setZ(!registers.h);
+		registers.pc++;
+		return 4;
+	}
+	case 0x25:		//DEC H
+	{
+		//Decrement Register H
+		setH(!(registers.h & 0x0F));
+		registers.h--;
+		setZ(!registers.h);
+		setN(1);
+		registers.pc++;
+		return 4;
+	}
+	case 0x26:      //LD H, n
+	{
+		//load n into H
+		registers.pc++;
+		registers.h = gb_read(registers.pc);
+		registers.pc++;//count past param
+		return 8;
+	}
+	case 0x27:		//DAA
+	{
+		//Decimal adjust register A
+		//Failure(0);
+		if (!(registers.f & NMASK)) {  // after an addition, adjust if (half-)carry occurred or if result is out of bounds
+			if ((registers.f & CMASK) || (registers.a > 0x99)) { registers.a += 0x60; setC(1); }
+			if ((registers.f & HMASK) || ((registers.a & 0x0f) > 0x09)) { registers.a += 0x06; }
+		}
+		else {  // after a subtraction, only adjust if (half-)carry occurred
+			if ((registers.f & CMASK)) { registers.a -= 0x60; }
+			if ((registers.f & HMASK)) { registers.a -= 0x06; }
+		}
+		// these flags are always updated
+		setZ(!(registers.a)); // the usual z flag
+		setH(0); // h flag is always cleared
+		registers.pc++;
+		return 4;
+	}
+	case 0x28:		//JR Z, n
+	{
+		//jump to current address plus n if Zflag is set 
+		if (registers.f & ZMASK) {
+			registers.pc++;
+			registers.pc += ((signed char)gb_read(registers.pc)); //forces twos complement and adjusts for counting past instruction
+			registers.pc++;
+			return 12;
+		}
+		else {
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0x29:		//ADD HL, HL
+	{
+		//Add HL to HL
+		setN(0);
+		setC(((int)registers.hl + (int)registers.hl) > 65535);
+		setH(((registers.hl & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
+		registers.hl += registers.hl;
+		registers.pc++;
+		return 8;
+	}
+	case 0x2A:		//LD A, (HL+)
+	{
+		//put value at address HL into A and increment HL;
+		registers.a = gb_read(registers.hl);
+		registers.hl++;
+		registers.pc++;
+		return 8;
+	}
+	case 0x2B:		//DEC HL
+	{
+		//decrement register HL
+		registers.hl--;
+		registers.pc++;
+		return 8;
+	}
+	case 0x2C:		//INC L
+	{
+		//increment register L
+		registers.l++;
+		setN(0);
+		setZ(!registers.l);
+		setH(registers.l % 16 == 0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x2D:		//DEC L
+	{
+		//Decrement Register L
+		setH(!(registers.l & 0x0F));
+		registers.l--;
+		setZ(!registers.l);
+		setN(1);
+		registers.pc++;
+		return 4;
+	}
+	case 0x2E:		//LD L, n
+	{
+		//load n into 
+		registers.pc++;
+		registers.l = gb_read(registers.pc);
+		registers.pc++;//count past param
+		return 8;
+	}
+	case 0x2F:		//CPL
+	{
+		//Complement A register (Flip all bits)
+		registers.f |= 0b01100000; //set N and H flags
+		registers.a = (-registers.a) - 1; //two's complement shenanigans
+		registers.pc++;
+		return 4;
+	}
+	case 0x30:		//JR NC, n
+	{
+		//jump to current address plus n if Cflag is reset 
+		if (!(registers.f & CMASK)) {
+			registers.pc++;
+			registers.pc = registers.pc + ((signed char)gb_read(registers.pc)); //forces twos complement and adjusts for counting past instruction
+			registers.pc++;
+			return 12;
+		}
+		else {
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0x31:		//LD SP, nn
+	{
+		//set stack pointer to nn
+		registers.pc++;
+		registers.sp = gb_read16(registers.pc);
+		registers.pc++;//count past the two parameters
+		registers.pc++;
+		return 12;
+	}
+	case 0x32:      //LDD (HL), A
+	{
+	  //load data(decrement) from A into (HL)
+	  	gb_write(registers.hl, registers.a);
+		registers.hl--;
+		registers.pc++;
+		return 8;
+	}
+	case 0x33:		//INC SP
+	{
+		//increment register SP
+		registers.sp++;
+		registers.pc++;
+		return 8;
+	}
+	case 0x34:		//INC (HL)
+	{
+		//Increment data at address HL
+		gb_write(registers.hl, gb_read(registers.hl) + 1);
+		setZ(!(gb_read(registers.hl)));
+		setH(gb_read(registers.hl) % 16 == 0);
+		setN(0);
+		registers.pc++;
+		return 12;
+	}
+	case 0x35:		//DEC (HL)
+	{
+		//Decrement data at address HL
+		setH(!(gb_read(registers.hl) & 0x0F));
+		gb_write(registers.hl, gb_read(registers.hl) - 1);
+		setZ(!(gb_read(registers.hl)));
+		setN(1);
+		registers.pc++;
+		return 12;
+	}
+	case 0x36:		//LD (HL), n
+	{
+		//Load n into memory at (HL)
+		registers.pc++;
+		gb_write(registers.hl, gb_read(registers.pc));
+		registers.pc++;//count past param
+		return 12;
+	}
+	case 0x37:		//SCF
+	{
+		//Set Carry flag
+		setN(0);
+		setH(0);
+		setC(1);
+		registers.pc++;
+		return 4;
+	}
+	case 0x38:		//JR C, n
+	{
+		//jump to current address plus n if Cflag is set 
+		if (registers.f & CMASK) {
+			registers.pc++;
+			registers.pc = registers.pc + ((signed char)gb_read(registers.pc)); //forces twos complement and adjusts for counting past instruction
+			registers.pc++;
+			return 12;
+		}
+		else {
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0x39:		//ADD HL, SP
+	{
+		//Add SP to HL
+		setN(0);
+		setC(((int)registers.sp + (int)registers.hl) > 65535);
+		setH(((registers.sp & 0x0FFF) + (registers.hl & 0x0FFF)) > 4095);
+		registers.hl = registers.hl + registers.sp;
+		registers.pc++;
+		return 8;
+	}
+	case 0x3A:		//LD A, (HL-)
+	{
+		//put value at address HL into A and decrement HL;
+		registers.a = gb_read(registers.hl);
+		registers.hl--;
+		registers.pc++;
+		return 8;
+	}
+	case 0x3B:		//DEC SP
+	{
+		//decrement Stack Pointer
+		registers.sp--;
+		registers.pc++;
+		return 8;
+	}
+	case 0x3C:		//INC A
+	{
+		//Increment Register A
+		registers.a++;
+		setZ(!registers.a);
+		setH(registers.a % 16 == 0);
+		setN(0);
+		registers.pc++;
+		return 4;
+	}
+	case 0x3D:		//DEC A
+	{
+		//Decrement Register A
+		setH(!(registers.a & 0x0F));
+		registers.a--;
+		setZ(!registers.a);
+		setN(1);
+		registers.pc++;
+		return 4;
+	}
+	case 0x3E:      //LD A, n
+	{
+	  //load n into A
+		registers.a = gb_read(registers.pc + 1);
+		registers.pc++;//count past param
+		registers.pc++;
+		return 8;
+	}
+	case 0x3F:		//CCF
+	{
+		//Complement Carry Flag
+		setN(0);
+		setH(0);
+		setC(!(registers.f&0b00010000));
+		registers.pc++;
+		return 4;
+	}
+	case 0x40:		//LD B, B
+	{
+		//Put value of register B into register B
+		//registers.b = registers.b;
+		#ifdef MOONEYE
+		moon_signal = true;
+		#endif
+		registers.pc++;
+		return 4;
+	}
+	case 0x41:		//LD B, C
+	{
+		//Put value of register C into register B
+		registers.b = registers.c;
+		registers.pc++;
+		return 4;
+	}
+	case 0x42:		//LD B, D
+	{
+		//Put value of register D into register B
+		registers.b = registers.d;
+		registers.pc++;
+		return 4;
+	}
+	case 0x43:		//LD B, E
+	{
+		//Put value of register E into register B
+		registers.b = registers.e;
+		registers.pc++;
+		return 4;
+	}
+	case 0x44:		//LD B, H
+	{
+		//Put value of register H into register B
+		registers.b = registers.h;
+		registers.pc++;
+		return 4;
+	}
+	case 0x45:		//LD B, L
+	{
+		//Put value of register L into register B
+		registers.b = registers.l;
+		registers.pc++;
+		return 4;
+	}
+	case 0x46:		//LD B, (HL)
+	{
+		//put value at address HL into register B
+		registers.b = gb_read(registers.hl);
+		registers.pc++;
+		return 8;
+	}
+	case 0x47:		//LD B, A
+	{
+		//Put value of register A into register B
+		registers.b = registers.a;
+		registers.pc++;
+		return 4;
+	}
+	case 0x48:		//LD C, B
+	{
+		//Put value of register B into register C
+		registers.c = registers.b;
+		registers.pc++;
+		return 4;
+	}
+	case 0x49:		//LD C, C
+	{
+		//Put value of register C into register C
+		//registers.c = registers.c;
+		registers.pc++;
+		return 4;
+	}
+	case 0x4A:		//LD C, D
+	{
+		//Put value of register D into register C
+		registers.c = registers.d;
+		registers.pc++;
+		return 4;
+	}
+	case 0x4B:		//LD C, E
+	{
+		//Put value of register E into register C
+		registers.c = registers.e;
+		registers.pc++;
+		return 4;
+	}
+	case 0x4C:		//LD C, H
+	{
+		//Put value of register H into register C
+		registers.c = registers.h;
+		registers.pc++;
+		return 4;
+	}
+	case 0x4D:		//LD C, L
+	{
+		//Put value of register L into register C
+		registers.c = registers.l;
+		registers.pc++;
+		return 4;
+	}
+	case 0x4E:		//LD C, (HL)
+	{
+		//put value at address HL into register C
+		registers.c = gb_read(registers.hl);
+		registers.pc++;
+		return 8;
+	}
+	case 0x4F:		//LD C, A
+	{
+		//Put value of register A into register C
+		registers.c = registers.a;
+		registers.pc++;
+		return 4;
+	}
+	case 0x50:		//LD D, B
+	{
+		//Put value of register B into register D
+		registers.d = registers.b;
+		registers.pc++;
+		return 4;
+	}
+	case 0x51:		//LD D, C
+	{
+		//Put value of register C into register D
+		registers.d = registers.c;
+		registers.pc++;
+		return 4;
+	}
+	case 0x52:		//LD D, D
+	{
+		//Put value of register D into register D
+		//registers.d = registers.d;
+		registers.pc++;
+		return 4;
+	}
+	case 0x53:		//LD D, E
+	{
+		//Put value of register E into register D
+		registers.d = registers.e;
+		registers.pc++;
+		return 4;
+	}
+	case 0x54:		//LD D, H
+	{
+		//Put value of register H into register D
+		registers.d = registers.h;
+		registers.pc++;
+		return 4;
+	}
+	case 0x55:		//LD D, L
+	{
+		//Put value of register L into register D
+		registers.d = registers.l;
+		registers.pc++;
+		return 4;
+	}
+	case 0x56:		//LD D, (HL)
+	{
+		//put value at address HL into register D
+		registers.d = gb_read(registers.hl);
+		registers.pc++;
+		return 8;
+	}
+	case 0x57:		//LD D, A
+	{
+		//Put value of register A into register D
+		registers.d = registers.a;
+		registers.pc++;
+		return 4;
+	}
+	case 0x58:		//LD E, B
+	{
+		//Put value of register B into register E
+		registers.e = registers.b;
+		registers.pc++;
+		return 4;
+	}
+	case 0x59:		//LD E, C
+	{
+		//Put value of register C into register E
+		registers.e = registers.c;
+		registers.pc++;
+		return 4;
+	}
+	case 0x5A:		//LD E, D
+	{
+		//Put value of register D into register E
+		registers.e = registers.d;
+		registers.pc++;
+		return 4;
+	}
+	case 0x5B:		//LD E, E
+	{
+		//Put value of register E into register E
+		//registers.e = registers.e;
+		registers.pc++;
+		return 4;
+	}
+	case 0x5C:		//LD E, H
+	{
+		//Put value of register H into register E
+		registers.e = registers.h;
+		registers.pc++;
+		return 4;
+	}
+	case 0x5D:		//LD E, L
+	{
+		//Put value of register L into register E
+		registers.e = registers.l;
+		registers.pc++;
+		return 4;
+	}
+	case 0x5E:		//LD E, (HL)
+	{
+		//put value at address HL into register E
+		registers.e = gb_read(registers.hl);
+		registers.pc++;
+		return 8;
+	}
+	case 0x5F:		//LD E, A
+	{
+		//Put value of register A into register E
+		registers.e = registers.a;
+		registers.pc++;
+		return 4;
+	}
+	case 0x60:		//LD H, B
+	{
+		//Put value of register B into register H
+		registers.h = registers.b;
+		registers.pc++;
+		return 4;
+	}
+	case 0x61:		//LD H, C
+	{
+		//Put value of register C into register H
+		registers.h = registers.c;
+		registers.pc++;
+		return 4;
+	}
+	case 0x62:		//LD H, D
+	{
+		//Put value of register D into register H
+		registers.h = registers.d;
+		registers.pc++;
+		return 4;
+	}
+	case 0x63:		//LD H, E
+	{
+		//Put value of register E into register H
+		registers.h = registers.e;
+		registers.pc++;
+		return 4;
+	}
+	case 0x64:		//LD H, H
+	{
+		//Put value of register H into register H
+		//registers.h = registers.h;
+		registers.pc++;
+		return 4;
+	}
+	case 0x65:		//LD H, L
+	{
+		//Put value of register L into register H
+		registers.h = registers.l;
+		registers.pc++;
+		return 4;
+	}
+	case 0x66:		//LD H, (HL)
+	{
+		//put value at address HL into register H
+		registers.h = gb_read(registers.hl);
+		registers.pc++;
+		return 8;
+	}
+	case 0x67:		//LD H, A
+	{
+		//Put value of register A into register H
+		registers.h = registers.a;
+		registers.pc++;
+		return 4;
+	}
+	case 0x68:		//LD L, B
+	{
+		//Put value of register B into register L
+		registers.l = registers.b;
+		registers.pc++;
+		return 4;
+	}
+	case 0x69:		//LD L, C
+	{
+		//Put value of register C into register L
+		registers.l = registers.c;
+		registers.pc++;
+		return 4;
+	}
+	case 0x6A:		//LD L, D
+	{
+		//Put value of register D into register L
+		registers.l = registers.d;
+		registers.pc++;
+		return 4;
+	}
+	case 0x6B:		//LD L, E
+	{
+		//Put value of register E into register L
+		registers.l = registers.e;
+		registers.pc++;
+		return 4;
+	}
+	case 0x6C:		//LD L, H
+	{
+		//Put value of register H into register L
+		registers.l = registers.h;
+		registers.pc++;
+		return 4;
+	}
+	case 0x6D:		//LD L, L
+	{
+		//Put value of register L into register L
+		//registers.l = registers.l;
+		registers.pc++;
+		return 4;
+	}
+	case 0x6E:		//LD L, (HL)
+	{
+		//put value at address HL into register L
+		registers.l = gb_read(registers.hl);
+		registers.pc++;
+		return 8;
+	}
+	case 0x6F:		//LD L, A
+	{
+		//Put value of register A into register L
+		registers.l = registers.a;
+		registers.pc++;
+		return 4;
+	}
+	case 0x70:		//LD (HL), B
+	{
+		//Put value of register B into memory at (HL)
+		gb_write(registers.hl, registers.b);
+		registers.pc++;
+		return 8;
+	}
+	case 0x71:		//LD (HL), C
+	{
+		//Put value of register C into memory at (HL)
+		gb_write(registers.hl, registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0x72:		//LD (HL), D
+	{
+		//Put value of register D into memory at (HL)
+		gb_write(registers.hl, registers.d);
+		registers.pc++;
+		return 8;
+	}
+	case 0x73:		//LD (HL), E
+	{
+		//Put value of register E into memory at (HL)
+		gb_write(registers.hl, registers.e);
+		registers.pc++;
+		return 8;
+	}
+	case 0x74:		//LD (HL), H
+	{
+		//Put value of register H into memory at (HL)
+		gb_write(registers.hl, registers.h);
+		registers.pc++;
+		return 8;
+	}
+	case 0x75:		//LD (HL), L
+	{
+		//Put value of register L into memory at (HL)
+		gb_write(registers.hl, registers.l);
+		registers.pc++;
+		return 8;
+	}
+	case 0x76:		//HALT
+	{
+		//Stop!
+		registers.pc++;
+		halted = true;
+		//Failure(3);
+		return 4;
+	}
+	case 0x77:		//LD (HL), A
+	{
+		//Put register A into memory at address HL
+		gb_write(registers.hl, registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x78:		//LD A, B
+	{
+		//Put value of register B into register A
+		registers.a = registers.b;
+		registers.pc++;
+		return 4;
+	}
+	case 0x79:		//LD A, C
+	{
+		//Put value of register C into register A
+		registers.a = registers.c;
+		registers.pc++;
+		return 4;
+	}
+	case 0x7A:		//LD A, D
+	{
+		//Put value of register D into register A
+		registers.a = registers.d;
+		registers.pc++;
+		return 4;
+	}
+	case 0x7B:		//LD A, E
+	{
+		//Put value of register E into register A
+		registers.a = registers.e;
+		registers.pc++;
+		return 4;
+	}
+	case 0x7C:		//LD A, H
+	{
+		//Put value of register H into register A
+		registers.a = registers.h;
+		registers.pc++;
+		return 4;
+	}
+	case 0x7D:		//LD A, L
+	{
+		//Put value of register L into register A
+		registers.a = registers.l;
+		registers.pc++;
+		return 4;
+	}
+	case 0x7E:		//LD A, (HL)
+	{
+		//Put value at address (HL) into register A
+		registers.a = gb_read(registers.hl);
+		registers.pc++;
+		return 8;
+	}
+	case 0x7F:		//LD A, A
+	{
+		//Put value of register A into register A
+		registers.a = registers.a;
+		registers.pc++;
+		return 4;
+	}
+	case 0x80:		//ADD A, B
+	{
+		//Add B to A
+		registers.f = 0x00;
+		setC(((int)registers.b + (int)registers.a)>255);
+		setH(((registers.b & 0x0F) + (registers.a & 0x0F))>15);
+		registers.a += registers.b;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x81:		//ADD A, C
+	{
+		//Add C to A
+		registers.f = 0x00;
+		setC(((int)registers.c + (int)registers.a) > 255);
+		setH(((registers.c & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a += registers.c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x82:		//ADD A, D
+	{
+		//Add D to A
+		registers.f = 0x00;
+		setC(((int)registers.d + (int)registers.a) > 255);
+		setH(((registers.d & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a += registers.d;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x83:		//ADD A, E
+	{
+		//Add E to A
+		registers.f = 0x00;
+		setC(((int)registers.e + (int)registers.a) > 255);
+		setH(((registers.e & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a += registers.e;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x84:		//ADD A, H
+	{
+		//Add H to A
+		registers.f = 0x00;
+		setC(((int)registers.h + (int)registers.a) > 255);
+		setH(((registers.h & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a += registers.h;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x85:		//ADD A, L
+	{
+		//Add L to A
+		registers.f = 0x00;
+		setC(((int)registers.l + (int)registers.a) > 255);
+		setH(((registers.l & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a += registers.l;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x86:		//ADD A, (HL)
+	{
+		//Add data in (HL) to A
+		registers.f = 0x00;
+		setC(((int)gb_read(registers.hl) + (int)registers.a) > 255);
+		setH(((gb_read(registers.hl) & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.a += gb_read(registers.hl);
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x87:		//ADD A, A
+	{
+		//Add A to A
+		registers.f = 0x00;
+		setC(registers.a >= 128);
+		setH((registers.a & 0x0F) >= 8);
+		registers.a += registers.a;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x88:		//ADC A, b
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)registers.b) > 255);
+		setH(((registers.b & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += registers.b + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x89:		//ADC A, C
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)registers.c) > 255);
+		setH(((registers.c & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += registers.c + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x8A:		//ADC A, D
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)registers.d) > 255);
+		setH(((registers.d & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += registers.d + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x8B:		//ADC A, E
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)registers.e) > 255);
+		setH(((registers.e & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += registers.e + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x8C:		//ADC A, H
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)registers.h) > 255);
+		setH(((registers.h & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += registers.h + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x8D:		//ADC A, L
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)registers.l) > 255);
+		setH(((registers.l & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += registers.l + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x8E:		//ADC A, (HL)
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)gb_read(registers.hl)) > 255);
+		setH(((gb_read(registers.hl) & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += gb_read(registers.hl) + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0x8F:		//ADC A, A
+	{
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = 0x00;
+		setC(((int)c + (int)registers.a + (int)registers.a) > 255);
+		setH(((registers.a & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += registers.a + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x90:      //SUB B
+	{
+		//Subtract B from A
+		registers.f = NMASK;
+		setC(registers.b > registers.a);
+		setH((registers.b & 0x0F) > (registers.a & 0x0F));
+		registers.a -= registers.b;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x91:      //SUB C
+	{
+		//Subtract C from A
+		registers.f = NMASK;
+		setC(registers.c > registers.a);
+		setH((registers.c & 0x0F) > (registers.a & 0x0F));
+		registers.a -= registers.c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x92:      //SUB D
+	{
+		//Subtract D from A
+		registers.f = NMASK;
+		setC(registers.d > registers.a);
+		setH((registers.d & 0x0F) > (registers.a & 0x0F));
+		registers.a -= registers.d;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x93:      //SUB E
+	{
+		//Subtract E from A
+		registers.f = NMASK;
+		setC(registers.e > registers.a);
+		setH((registers.e & 0x0F) > (registers.a & 0x0F));
+		registers.a -= registers.e;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x94:      //SUB H
+	{
+		//Subtract H from A
+		registers.f = NMASK;
+		setC(registers.h > registers.a);
+		setH((registers.h & 0x0F) > (registers.a & 0x0F));
+		registers.a -= registers.h;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x95:		//SUB L
+	{
+		//Subtract L from A
+		registers.f = NMASK;
+		setC(registers.l > registers.a);
+		setH((registers.l & 0x0F) > (registers.a & 0x0F));
+		registers.a -= registers.l;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x96:		//SUB (HL)
+	{
+		//Subtract Data at HL from A
+		registers.f = NMASK;
+		setC(gb_read(registers.hl) > registers.a);
+		setH((gb_read(registers.hl) & 0x0F) > (registers.a & 0x0F));
+		registers.a -= gb_read(registers.hl);
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x97:		//SUB A
+	{
+		//Subtract A from A
+		registers.f = NMASK + ZMASK;
+		registers.a = 0x00;
+		registers.pc++;
+		return 4;
+	}
+	case 0x98:		//SBC A, B
+	{
+		//Subtract B + Cflag from A
+		bool c = (registers.f & CMASK);
+		registers.f = NMASK;
+		setC(((int)c + (int)registers.b) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (registers.b & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= (registers.b + c);
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x99:		//SBC A, C
+	{
+		//Subtract C + Cflag from A
+		bool c = (registers.f & CMASK);
+		registers.f = NMASK;
+		setC(((int)c + (int)registers.c) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (registers.c & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= registers.c + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x9A:		//SBC A, D
+	{
+		//Subtract D + Cflag from A
+		bool c = (registers.f & CMASK);
+		registers.f = NMASK;
+		setC(((int)c + (int)registers.d) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (registers.d & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= registers.d + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x9B:		//SBC A, E
+	{
+		//Subtract E + Cflag from A
+		bool c = (registers.f & CMASK);
+		registers.f = NMASK;
+		setC(((int)c + (int)registers.e) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (registers.e & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= registers.e + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x9C:		//SBC A, H
+	{
+		//Subtract H + Cflag from A
+		bool c = (registers.f & CMASK);
+		registers.f = NMASK;
+		setC(((int)c + (int)registers.h) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (registers.h & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= registers.h + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x9D:		//SBC A, L
+	{
+		//Subtract L + Cflag from A
+		bool c = (registers.f & CMASK);
+		registers.f = NMASK;
+		setC(((int)c + (int)registers.l) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (registers.l & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= registers.l + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x9E:		//SBC A, (HL)
+	{
+		//Subtract data at HL + Cflag from A
+		bool c = (registers.f & CMASK);
+		registers.f = NMASK;
+		setC(((int)c + (int)gb_read(registers.hl)) > (int)registers.a);
+		setH(((registers.a & 0x0F) - (gb_read(registers.hl) & 0xf) - (c & 0x0F)) & 0x10);
+		registers.a -= gb_read(registers.hl) + c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0x9F:		//SBC A, A
+	{
+		//Subtract A + Cflag from A
+		bool c = (registers.f & CMASK);
+		setN(1);
+		setH((((registers.a & 0x0F) - (registers.a & 0xf) - (c & 0x0F)) & 0x10)!=0);
+		registers.a = (c ? 0xFF : 0x00);
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA0:		//AND B
+	{
+		//Logically AND B with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= registers.b;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA1:		//AND C
+	{
+		//Logically AND C with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= registers.c;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA2:		//AND D
+	{
+		//Logically AND D with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= registers.d;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA3:		//AND E
+	{
+		//Logically AND E with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= registers.e;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA4:		//AND H
+	{
+		//Logically AND H with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= registers.h;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA5:		//AND L
+	{
+		//Logically AND L with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= registers.l;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA6:		//AND (HL)
+	{
+		//Logically AND (HL) with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= gb_read(registers.hl);
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0xA7:		//AND A
+	{
+		//Logically AND A with A, place result in A
+		registers.f = HMASK;//reset N, set H, reset C
+		registers.a &= registers.a;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA8:		//XOR B
+	{
+		//logical XOR between A and B.
+		registers.a ^= registers.b;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xA9:		//XOR C
+	{
+		//logical XOR between A and C.
+		registers.a ^= registers.c;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xAA:		//XOR D
+	{
+		//logical XOR between A and D.
+		registers.a ^= registers.d;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xAB:		//XOR E
+	{
+		//logical XOR between A and E.
+		registers.a ^= registers.e;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xAC:		//XOR H
+	{
+		//logical XOR between A and H.
+		registers.a ^= registers.h;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xAD:		//XOR L
+	{
+		//logical XOR between A and L.
+		registers.a ^= registers.l;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xAE:		//XOR (HL)
+	{
+		//logical XOR between A and (HL).
+		registers.a ^= gb_read(registers.hl);
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xAF:      //XOR A
+	{
+	  //logical XOR between A and ... A. so 0 into A
+		registers.a = 0x00;
+		registers.f = ZMASK; //set zero flag
+		registers.pc++;
+		return 4;
+	}
+	case 0xB0:		//OR B
+	{
+		//Logical OR Register B with Register A, place result in A
+		registers.a |= registers.b;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB1:		//OR C
+	{
+		//Logical OR Register C with Register A, place result in A
+		registers.a |= registers.c;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB2:		//OR D
+	{
+		//Logical OR Register D with Register A, place result in A
+		registers.a |= registers.d;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB3:		//OR E
+	{
+		//Logical OR Register E with Register A, place result in A
+		registers.a |= registers.e;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB4:		//OR H
+	{
+		//Logical OR Register H with Register A, place result in A
+		registers.a |= registers.h;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB5:		//OR L
+	{
+		//Logical OR Register L with Register A, place result in A
+		registers.a |= registers.l;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB6:		//OR (HL)
+	{
+		//Logical OR data at HL with Register A, place result in A
+		registers.a |= gb_read(registers.hl);
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB7:		//OR A
+	{
+		//Logical OR Register A with Register A, place result in A
+		//registers.a |= registers.a;
+		registers.f = 0x00;
+		setZ(!registers.a);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB8:		//CP B
+	{
+		//compare data in B to A
+		registers.f = NMASK;
+		setC(registers.b > registers.a);
+		setH((registers.b & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == registers.b);
+		registers.pc++;
+		return 4;
+	}
+	case 0xB9:		//CP C
+	{
+		//compare data in C to A
+		registers.f = NMASK;
+		setC(registers.c > registers.a);
+		setH((registers.c & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == registers.c);
+		registers.pc++;
+		return 4;
+	}
+	case 0xBA:		//CP D
+	{
+		//compare data in D to A
+		registers.f = NMASK;
+		setC(registers.d > registers.a);
+		setH((registers.d & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == registers.d);
+		registers.pc++;
+		return 4;
+	}
+	case 0xBB:		//CP E
+	{
+		//compare data in E to A
+		registers.f = NMASK;
+		setC(registers.e > registers.a);
+		setH((registers.e & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == registers.e);
+		registers.pc++;
+		return 4;
+	}
+	case 0xBC:		//CP H
+	{
+		//compare data in H to A
+		registers.f = NMASK;
+		setC(registers.h > registers.a);
+		setH((registers.h & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == registers.h);
+		registers.pc++;
+		return 4;
+	}
+	case 0xBD:		//CP L
+	{
+		//compare data in L to A
+		registers.f = NMASK;
+		setC(registers.l > registers.a);
+		setH((registers.l & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == registers.l);
+		registers.pc++;
+		return 4;
+	}
+	case 0xBE:		//CP (HL)
+	{
+		//compare data at (HL) to A
+		registers.f = NMASK;
+		setC(gb_read(registers.hl) > registers.a);
+		setH((gb_read(registers.hl) & 0x0F) > (registers.a & 0x0F));
+		setZ(registers.a == gb_read(registers.hl));
+		registers.pc++;
+		return 8;
+	}
+	case 0xBF:		//CP A
+	{
+		//compare data in A to A
+		registers.f = ZMASK + NMASK;
+		registers.pc++;
+		return 4;
+	}
+	case 0xC0:		//RET NZ
+	{
+		//return if Zflag is reset
+		if (!(registers.f & ZMASK)) {
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			return 20;
+		}
+		else {
+			registers.pc++;//jump past parameter
+			return 8;
+		}
+	}
+	case 0xC1:		//POP BC
+	{
+		registers.c = PopStack();
+		registers.b = PopStack();
+		registers.pc++;
+		return 12;
+	}
+	case 0xC2:		//JP NZ, nn
+	{
+		//jump to nn if Zflag is reset 
+		if (!(registers.f & ZMASK)) {
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 12;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0xC3:      //JP nn
+	{
+		//jump to address nn (lsByte first)
+		registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+		return 12;
+	}
+	case 0xC4:		//CALL NZ, nn
+	{
+		//Call to nn if Zflag is reset 
+		if (!(registers.f & ZMASK)) {
+			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
+			PushStack((registers.pc + 3) & 0x00FF);
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 24;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 12;
+		}
+		return 4;
+	}
+	case 0xC5:		//PUSH BC
+	{
+		registers.pc++;
+		PushStack(registers.b);
+		PushStack(registers.c);
+		return 16;
+	}
+	case 0xC6:		//ADD A, n
+	{
+		//Add n to A
+		registers.f = 0x00;
+		setC(((int)gb_read(registers.pc+1) + (int)registers.a) > 255);
+		setH(((gb_read(registers.pc + 1) & 0x0F) + (registers.a & 0x0F)) > 15);
+		registers.pc++;
+		registers.a += gb_read(registers.pc);
+		setZ(!registers.a);
+		registers.pc++; //jump past parameter
+		return 8;
+	}
+	case 0xC7:		//RST 00H
+	{
+		//Put next address on stack
+		//set PC on 0x0000
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0000;
+		return 32;
+	}
+	case 0xC8:		//RET Z
+	{
+		//return if Zflag is set
+		if (registers.f & ZMASK) {
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			return 20;
+		}
+		else {
+			registers.pc++; //jump past parameter
+			return 8;
+		}
+	}
+	case 0xC9:		//RET
+	{
+		//return from sub routine, pop two bytes off stack and jump to that address;
+		registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+		return 16;
+	}
+	case 0xCA:		//JP Z, nn
+	{
+		//jump to nn if Zflag is set 
+		if (registers.f & ZMASK) {
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 12;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0xCB:		//THE GREAT AND TERRIFYING PREFIX
+	{
+		//run all the extra op codes with this prefix
+		registers.pc++;
+		return CBPrefix();
+	}
+	case 0xCC:		//CALL Z, nn
+	{
+		//Call to nn if Zflag is set 
+		if (registers.f & ZMASK) {
+			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
+			PushStack((registers.pc + 3) & 0x00FF);
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 24;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 12;
+		}
+		return 4;
+	}
+	case 0xCD:		//CALL (nn)
+	{
+		//push address of next instruction onto stack and then jump to address nn
+		PushStack(((registers.pc + 3) & 0xFF00) >> 8);
+		PushStack((registers.pc + 3) & 0x00FF);
+		registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+		return 12;
+	}
+	case 0xCE:		//ADC A, n
+	{
+		bool c = ((registers.f & 0b00010000) >> 4);
+		registers.f = 0x00;
+		registers.pc++;
+		setC(((int)c + (int)registers.a + (int)gb_read(registers.pc)) > 255);
+		setH(((gb_read(registers.pc) & 0x0F) + (registers.a & 0x0F) + c) > 15);
+		registers.a += gb_read(registers.pc) + c;
+		setZ(!registers.a);
+		registers.pc++; //Increment past param
+		return 8;
+	}
+	case 0xCF:		//RST 08H
+	{
+		//Put next address on stack
+		//set PC on 0x0008
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0008;
+		return 32;
+	}
+	case 0xD0:		//RET NC
+	{
+		//return if Cflag is reset
+		if (!(registers.f & CMASK)) {
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			return 20;
+		}
+		else {
+			registers.pc++;//jump past parameter
+			return 8;
+		}
+	}
+	case 0xD1:		//POP DE
+	{
+		registers.e = PopStack();
+		registers.d = PopStack();
+		registers.pc++;
+		return 12;
+	}
+	case 0xD2:		//JP NC, nn
+	{
+		//jump to nn if Cflag is reset 
+		if (!(registers.f & CMASK)) {
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 12;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0xD3:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xD4:		//CALL NC, nn
+	{
+		//Call to nn if Cflag is reset 
+		if (!(registers.f & CMASK)) {
+			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
+			PushStack((registers.pc + 3) & 0x00FF);
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 24;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 12;
+		}
+	}
+	case 0xD5:		//PUSH DE
+	{
+		//push DE onto the stack
+		registers.pc++;
+		PushStack(registers.d);
+		PushStack(registers.e);
+		return 16;
+	}
+	case 0xD6:      //SUB n
+	{
+		//Subtract n from A
+		registers.f = NMASK;
+		registers.pc++;
+		setC(gb_read(registers.pc) > registers.a);
+		setH((gb_read(registers.pc) & 0x0F) > (registers.a & 0x0F));
+		registers.a -= gb_read(registers.pc);
+		setZ(!(registers.a));
+		registers.pc++;//Jump past param
+		return 8;
+	}
+	case 0xD7:		//RST 10H;
+	{
+		//Put next address on stack
+		//set PC on 0x0010
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0010;
+		return 32;
+	}
+	case 0xD8:		//RET C
+	{
+		//return if Cflag is set
+		if (registers.f & CMASK) {
+			registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+			return 20;
+		}
+		else {
+			registers.pc++; //jump past parameter
+			return 8;
+		}
+	}
+	case 0xD9:		//RETI
+	{
+		//return from Interrupt, pop two bytes off stack and jump to that address. then reenable interrupts
+		registers.pc = (int)PopStack() + ((int)PopStack() << 8);
+		preIME = 1;
+		return 16;
+	}
+	case 0xDA:		//JP C, nn
+	{
+		//jump to nn if Cflag is set 
+		if (registers.f & CMASK) {
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 12;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 8;
+		}
+	}
+	case 0xDB:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xDC:		//CALL C, nn
+	{
+		//Call to nn if Cflag is set 
+		if (registers.f & CMASK) {
+			PushStack(((registers.pc + 3) & 0xFF00) >> 8);
+			PushStack((registers.pc + 3) & 0x00FF);
+			registers.pc = (gb_read(registers.pc + 1) + (gb_read(registers.pc + 2) << 8));
+			return 24;
+		}
+		else {
+			registers.pc++;
+			registers.pc++;//jump past parameter
+			registers.pc++;
+			return 12;
+		}
+	}
+	case 0xDD:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xDE:		//SBC A, n
+	{
+		//Subtract n + Cflag from A
+		bool c = ((registers.f & CMASK) >> 4);
+		registers.f = NMASK;
+		setC(((int)c + (int)gb_read(registers.pc+1)) > (int)registers.a);
+		setH(((gb_read(registers.pc + 1) & 0x0F) + c) > (registers.a & 0x0F));
+		registers.a -= gb_read(registers.pc + 1) + c;
+		setZ(!registers.a);
+		registers.pc++; // Increment past param
+		registers.pc++;
+		return 4;
+	}
+	case 0xDF:		//RST 18H;
+	{
+		//Put next address on stack
+		//set PC on 0x0028
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0018;
+		return 32;
+	}
+	case 0xE0:      //LDH (n), A
+	{
+	    //put A into memory address $FF00(IOports) + n
+		gb_write(0xFF00 + gb_read(registers.pc + 1), registers.a);
+		registers.pc++;//increment past param
+		registers.pc++;
+		return 12;
+	}
+	case 0xE1:		//POP HL
+	{
+		registers.l = PopStack();
+		registers.h = PopStack();
+		registers.pc++;
+		return 12;
+	}
+	case 0xE2:		//LD (C), A
+	{
+		//put register A into address $FF00 + register C
+		gb_write(0xFF00 + registers.c, registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0xE3:      //NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xE4:      //NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xE5:		//PUSH HL
+	{
+		PushStack(registers.h);
+		PushStack(registers.l);
+		registers.pc++;
+		return 16;
+	}
+	case 0xE6:		//AND n
+	{
+		//Logically AND n with A, place result in A
+		registers.f = 0b00100000;//reset N, set H, reset C
+		registers.pc++;
+		registers.a &= gb_read(registers.pc);
+		setZ(!registers.a);
+		registers.pc++;
+		return 8;
+	}
+	case 0xE7:		//RST 20H;
+	{
+		//Put next address on stack
+		//set PC on 0x0020
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0020;
+		return 32;
+	}
+	case 0xE8:		//ADD SP, n
+	{
+		//Add n to SP
+		registers.f = 0x00;
+		registers.pc++;
+		signed char n = ((signed char)gb_read(registers.pc));
+		setC(((registers.sp & 0xFF) + (n & 0xFF)) & 0x100);
+		setH(((registers.sp & 0x0F) + (n & 0x0F)) & 0x10);
+		registers.sp = registers.sp + n;
+		registers.pc++;
+		return 16;
+	}
+	case 0xE9:		//JP HL
+	{
+		//jump to the address in HL
+		registers.pc = registers.hl;
+		return 4;
+	}
+	case 0xEA:		//LD (nn), A
+	{
+		//put A into (nn)
+		registers.pc++;
+		gb_write(gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8), registers.a);
+		registers.pc++;//increment past params
+		registers.pc++;
+		return 16;
+	}
+	case 0xEB:      //NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xEC:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xED:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xEE:		//XOR n
+	{
+		//logical XOR between A and n.
+		registers.a ^= gb_read(registers.pc + 1);
+		registers.f = 0b00000000; //set zero flag
+		setZ(!registers.a);
+		registers.pc++;
+		registers.pc++;
+		return 4;
+	}
+	case 0xEF:		//RST 28H;
+	{
+		//Put next address on stack
+		//set PC on 0x0028
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0028;
+		return 32;
+	}
+	case 0xF0:      //LDH A, n
+	{
+	  //put memory address $FF00(IOports) + n into register A
+		registers.pc++;
+		registers.a = gb_read(0xFF00 + gb_read(registers.pc));
+		registers.pc++;//increment past param
+		return 12;
+	}
+	case 0xF1:		//POP AF
+	{
+		uint8_t f = PopStack();
+		setZ(f & 0b10000000);
+		setN(f & 0b01000000);
+		setH(f & 0b00100000);
+		setC(f & 0b00010000);
+		registers.a = PopStack();
+		registers.pc++;
+		return 12;
+	}
+	case 0xF2:		//LD A, (C)
+	{
+		//put $FF00 + register C into register A
+		registers.a = gb_read(0xFF00 + registers.c);
+		registers.pc++;
+		return 8;
+	}
+	case 0xF3:      //DI
+	{
+		//disable interrupts after instruction is complete
+		preIME = 0;
+		registers.pc++;
+		return 4;
+	}
+	case 0xF4:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xF5:		//PUSH AF
+	{
+		registers.pc++;
+		PushStack(registers.a);
+		PushStack(registers.f);
+		return 16;
+	}
+	case 0xF6:		//OR n
+	{
+		//Logically OR n with A, place result in A
+		registers.f = 0b00000000;//reset N, set H, reset C
+		registers.a |= gb_read(registers.pc + 1);
+		setZ(!registers.a);
+		registers.pc++; //jump past parameter
+		registers.pc++;
+		return 8;
+	}
+	case 0xF7:      //RST 30H
+	{
+		//Put current address on stack
+		//set PC on 0x0030
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0030;
+		return 32;
+	}
+	case 0xF8:		//LD HL, SP + n
+	{
+		//load SP + n(signed) into HL
+		registers.f = 0x00;
+		registers.pc++;
+		signed char n = ((signed char)gb_read(registers.pc));
+		setC(((registers.sp & 0xFF) + (n & 0xFF)) & 0x100);
+		setH(((registers.sp & 0x0F) + (n & 0x0F)) & 0x10);
+		registers.hl = registers.sp + n;
+		registers.pc++;
+		return 12;
+	}
+	case 0xF9:		//LD SP, HL
+	{
+		registers.sp = registers.hl;
+		registers.pc++;
+		return 8;
+	}
+	case 0xFA:		//LD A, (nn)
+	{
+		//Load value at the address nn into A;
+		registers.pc++;
+		registers.a = gb_read((gb_read(registers.pc) + (gb_read(registers.pc + 1) << 8)));
+		registers.pc++; //jump past params
+		registers.pc++;
+		return 16;
+	}
+	case 0xFB:      //EI
+	{
+		//enable interrupts after next instruction is complete
+		preIME = 1;
+		registers.pc++;
+		return 4;
+	}
+	case 0xFC:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xFD:		//NO INSTRUCTION
+	{
+		Failure(1);
+		return 0;
+	}
+	case 0xFE:      //CP n
+	{
+	  //Compare A with n
+	  //like an A-n instruction but forget the result
+		registers.pc++;
+		registers.f = NMASK;
+		setC(gb_read(registers.pc) > registers.a);
+		setH((gb_read(registers.pc) & 0x0F) > (registers.a & 0x0F));
+		setZ(gb_read(registers.pc) == registers.a);
+		registers.pc++;//jump past parameter
+		return 8;
+	}
+	case 0xFF:      //RST 38H
+	{
+	  //Put current address on stack
+	  //set PC on 0x0038
+		registers.pc++;
+		PushStack((registers.pc & 0xFF00) >> 8);
+		PushStack(registers.pc & 0x00FF);
+		//TODO: Test this please
+		registers.pc = 0x0038;
+		return 32;
+	}
+	default:
+	{
+		Failure(0);
+		return 0; 
+	}
+	}
+}
+
+void gbCPU_timers(uint8_t clock) {
+	static uint32_t clkCount = 0;
+	if (gb_read(0xFF07) & 0b00000100) {
+		clkCount += clock;
+		uint32_t cycles = 0;
+		switch (gb_read(0xFF07) & 0b00000011)
+		{
+		case 0:
+			cycles = 1024;
+			break;
+		case 1:
+			cycles = 16;
+			break;
+		case 2:
+			cycles = 64;
+			break;
+		case 3:
+			cycles = 256;
+			break;
+		}
+		if(clkCount >= cycles) {
+			gb_inc(0xFF05);
+			if (gb_read(0xFF05) == 0) {
+				//overflow, reset, and request interrupt
+				gb_write(0xFF05, gb_read(0xFF06)); 
+				gb_orWrite(0xFF0F, 0b00000100);
+			}
+			clkCount -= cycles;
+		}
+	}
+}
+
+int gbCPU_interrupts(int cycles) {
+	int IntCycles = 0; 
+
+	//OAM DMA Transfer
+	if (DMA != gb_read(0xFF46)) {
+		DMA = gb_read(0xFF46);
+		gb_DMA(DMA);
+		gb_write(0xFF46, 0xE1);
+		DMA = 0xE1;
+	}
+
+	//DIV Register counting
+	if (gb_read(0xFF04) != DIV) {
+		DIV = 0x00;
+		gb_write(0xFF04, 0x00);
+	} else {
+		DIV+=cycles-1;
+		gb_write(0xFF04, gb_read(0xFF04)+cycles-1);
+	}
+
+	// Interrupts
+	if (IME) {
+		if		(gb_read(0xFFFF) & 0b00000001 && gb_read(0xFF0F) & 0b00000001) {//Vblank
+			gb_andWrite(0xFF0F, 0b11111110);
+			preIME = false;
+			halted = false;
+			IntCycles += 20;
+			PushStack(((registers.pc) & 0xFF00) >> 8);
+			PushStack((registers.pc) & 0x00FF);
+			registers.pc = 0x0040;
+			// printf("Vblank interrupt taken\n");
+		}
+		else if (gb_read(0xFFFF) & 0b00000010 && gb_read(0xFF0F) & 0b00000010) {//LCD STAT
+			gb_andWrite(0xFF0F, 0b11111101);
+			preIME = false;
+			halted = false; 
+			IntCycles += 20;
+			PushStack(((registers.pc) & 0xFF00) >> 8);
+			PushStack((registers.pc) & 0x00FF);
+			registers.pc = 0x0048;
+			// printf("STAT interrupt taken\n");
+		}
+		else if (gb_read(0xFFFF) & 0b00000100 && gb_read(0xFF0F) & 0b00000100) {//Timer
+			gb_andWrite(0xFF0F, 0b11111011);
+			preIME = false;
+			halted = false;
+			IntCycles += 20;
+			PushStack(((registers.pc) & 0xFF00) >> 8);
+			PushStack((registers.pc) & 0x00FF);
+			registers.pc = 0x0050;
+			// printf("TIMER interrupt taken\n");
+		}
+		else if (gb_read(0xFFFF) & 0b00001000 && gb_read(0xFF0F) & 0b00001000) {//Serial
+			Failure(4);
+			//yeah. actually. skip this. not for my emulator yet
+		}
+		else if (gb_read(0xFFFF) & 0b00010000 && gb_read(0xFF0F) & 0b00010000) {//Joypad
+			Failure(4);
+		}
+	}
+	else if (halted) {
+		if (gb_read(0xFFFF) & 0b00000001 && gb_read(0xFF0F) & 0b00000001) {//Vblank
+			halted = false;
+			IntCycles += 32;
+		}
+		else if (gb_read(0xFFFF) & 0b00000010 && gb_read(0xFF0F) & 0b00000010) {//LCD STAT
+			halted = false;
+			IntCycles += 32;
+		}
+		else if (gb_read(0xFFFF) & 0b00000100 && gb_read(0xFF0F) & 0b00000100) {//Timer
+			halted = false;
+			IntCycles += 32;
+		}
+		else if (gb_read(0xFFFF) & 0b00001000 && gb_read(0xFF0F) & 0b00001000) {//Serial
+			Failure(4);
+		}
+		else if (gb_read(0xFFFF) & 0b00010000 && gb_read(0xFF0F) & 0b00010000) {//Joypad
+			Failure(4);
+		}
+	}
+
+	if (preIME != IME) {
+		IME = preIME;
+		if (IME) {
+			gb_andWrite(0xFF0F, 0b11100000);
+		}
+	}
+	
+	return IntCycles;
+}
+
+void gbCPU_setColor()
+{
+	registers = (struct reg){ {{{0x11,0x00}}},{{{0x00,0x00}}},{{{0xFF,0x56}}},{{{0x00,0x0d}}},0xFFFE,0x0100 };
+	registers.a = 0x11;
+	registers.b = 0x00;
+	setZ(1);
+	gb_write(0xFF46, 0x00);
+	DMA = 0x00;
+}
+
+void gbCPU_printInstruction()
+{
+
+	static bool print = 0;
+
+	if(print){
+	    printf("x%04X-x%02X | x%04X\n",registers.pc, gb_read(registers.pc), registers.af);
+	}
+	
+	// if(registers.pc == 0x294f){print = false;}
+
+	// if(MEM->flag){
+	// 	printf("PC - %X \n", registers.pc);
+	// 	MEM->flag = 0;
+	// }
+
+	#ifdef LOGFILE
+	static bool writing = 1;
+
+	if(registers.pc == 0x6a15){
+		writing = 1;
+	}
+	if(writing){
+		myfile << std::hex << registers.pc << "-" << std::hex << (int)gb_read(registers.pc);
+		myfile << " | AF-" << std::hex << registers.af << " BC-" << std::hex << registers.bc << " DE-" << std::hex << registers.de << " HL-" << std::hex << registers.hl;
+		myfile << std::endl;
+	}
+	if(registers.pc == 0x75a3){
+		// writing = 0;
+	}
+	#endif
+
+	// printf("%X\n", gb_read(0xFF80));
+}

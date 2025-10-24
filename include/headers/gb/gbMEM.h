@@ -47,7 +47,7 @@ int gbMEM_insertCart(game* cartridge);
 // write with cartridge operations
 void gbMEM_cartridgeWrite(uint16_t address, uint8_t data);
 void gbMEM_colorWriteChecks(uint16_t address, uint8_t data);
-inline void gb_write(uint16_t address, uint8_t data){
+static inline void gb_write(uint16_t address, uint8_t data){
 	if (address < 0x8000) {
 		gbMEM_cartridgeWrite(address, data);
 	}else if(color){

@@ -3,28 +3,12 @@
 
 #include "stdint.h"
 #include "SDL.h"
-#include "gb/gbMEM.h"
-#include <vector>
-#include "globals.h"
 
-class gbPPU{
-    private:
-        SDL_Renderer* renderer;
-        SDL_Texture* texture;
+void gbPPU_init(SDL_Renderer* rend);
+void gbPPU_deinit();
+void gbPPU_drawLine();
+void gbPPU_updatePPU(int cycles);
 
-        uint8_t Vram[160][144];
-
-    public:
-        gbPPU(SDL_Renderer* rend);
-        void drawLine();
-        void updatePPU(int cycles);
-
-        void renderFrame();
-
-    private:
-        void drawBackground();
-        void drawWindow();
-        void drawSprites();
-};
+void gbPPU_renderFrame();
 
 #endif /* GBPPU_H */
