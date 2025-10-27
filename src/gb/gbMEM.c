@@ -246,8 +246,6 @@ bool saveRam() {
 		char save_path[512];
 		sprintf(save_path, "%s%s.SAV", SAVE_DIR, game_p->name);
 		int fd = open(save_path, O_CREAT|O_RDWR|O_TRUNC);
-		// std::ofstream file(SAVE_DIR + (game_p->name) + ".SAV");
-		// file.open(SAVE_DIR + (game_p->name) + ".SAV", std::ios::out | std::ios::binary);
 		if (fd > 0)
 		{
 			lseek(fd, 0, SEEK_SET);
@@ -283,7 +281,11 @@ void gbMEM_deinit()
 	if(ram != NULL)
 		free(ram);
 	if(cart_fd >0){
+		#ifdef WIN32
+		free(cartridge);
+		#else
 		munmap(cartridge, cart_sb.st_size);
+		#endif
 		close(cart_fd);
 	}
 	game_p = NULL;
@@ -293,21 +295,18 @@ int gbMEM_insertCart(game* g){
 	char filepath[512];
 	sprintf(filepath, "%s%s", GAME_DIR, g->name);
 	cart_fd = open(filepath, O_RDONLY);
-	// std::ifstream file2(GAME_DIR + g->name, std::ios::in | std::ios::binary | std::ios::ate);
 	if (cart_fd >= 0)
 	{
 		fstat(cart_fd, &cart_sb);
+		#ifdef WIN32
+		cartridge = malloc(cart_sb.st_size);
+		lseek(cart_fd, 0, SEEK_SET);
+		read(cart_fd, cartridge, cart_sb.st_size);
+		#else
 		cartridge = mmap(NULL, cart_sb.st_size, PROT_READ,
 			MAP_PRIVATE, cart_fd, 0);
+		#endif
 		game_p = g;
-			/*
-			size = file2.tellg();
-			cartridge = new char[(int)size];
-			
-			file2.seekg(0, std::ios::beg);
-			file2.read(cartridge, size);
-			file2.close();
-			*/
 		memcpy(MEM, cartridge, 0x8000);
 		if (!setMBC(MEM[0x0147])) {
 			printf("\nUnrecognized MBC - %.2X\n", MEM[0x0147]);
@@ -340,7 +339,6 @@ void gbMEM_colorWriteChecks(uint16_t address, uint8_t data){
 			MEM[0xFF55] = 0xFF;
 		} else {
 			// Instant DMA
-			// printf("more DMA\n");
 			uint16_t size = ((data & 0x7f) + 1);
 			gbMEM_vRamDMAFull(size * 0x10);
 			// time += size;

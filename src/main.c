@@ -14,12 +14,17 @@ GB
 	    flickering?
 		parallax bug still
 	MEM
+		some sort of input problem?
 	CPU
 GBC
 	PPU
 		flickering
+		Sprites broken?
+		freezes sometimes
 GBA
 	Start Research
+
+Both acid files fail still...
 */
 
 // TODO: Audio system sadly
