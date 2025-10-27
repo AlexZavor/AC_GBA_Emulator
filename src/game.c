@@ -2,6 +2,11 @@
 #include "fcntl.h"
 #include "unistd.h"
 #include "stdio.h"
+#ifdef WIN32 //For creating save folder
+    #include "windows.h"
+#else
+    #include "sys/stat.h" 
+#endif
 
 static bool checkSave(char* name){
     char saveFile[300];
@@ -70,7 +75,14 @@ void loadDir(game* game_data, game_holder* Roms, const char* directory){
 
 // Load All Games from Global "GAME_DIR" Folder into Roms list
 void game_loadGames(game_holder* Roms){
-    mkdir(GAME_DIR, 0777); // If ./ROMS/ doesn't exist yet.
+    // If Rom and Save dir doesn't exist yet.
+    #ifdef WIN32
+    CreateDirectory(GAME_DIR, NULL);
+    CreateDirectory(SAVE_DIR, NULL);
+    #else
+    mkdir(GAME_DIR, 0777); 
+    mkdir(SAVE_DIR, 0777);
+    #endif
 
     // data arena for games (doesn't really get freed. but thats probably fine)
     game* game_data = (game*)calloc(256, sizeof(game));

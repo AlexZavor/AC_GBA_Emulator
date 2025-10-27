@@ -1,13 +1,16 @@
 #include "gb/gbMEM.h"
 
-#include "sys/stat.h" //For creating save folder
 // #include <fstream>
 #include "fcntl.h"
-#include <sys/mman.h>
 #include "unistd.h"
 #include "globals.h"
 #include "stdio.h"
 #include "string.h"
+#ifdef WIN32
+
+#else
+#include <sys/mman.h>
+#endif
 
 /*
 Interrupt Enable Register
@@ -240,7 +243,6 @@ bool setRam(uint8_t code) {
 bool saveRam() {
 	if (ramBanks > 0 && battery) {
 		memcpy(ram + (ramBank * 0x2000), MEM + 0xA000, 0x2000);
-		mkdir(SAVE_DIR, 0777);
 		char save_path[512];
 		sprintf(save_path, "%s%s.SAV", SAVE_DIR, game_p->name);
 		int fd = open(save_path, O_CREAT|O_RDWR|O_TRUNC);
