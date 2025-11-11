@@ -9,7 +9,7 @@
 #endif
 
 #ifdef FPS_COUNT
-    #define AVG_BUFFER_SIZE 600
+    #define AVG_BUFFER_SIZE 60
 	static float minTime = 999;
 	static float maxTime = 0;
     static float avg_buffer[AVG_BUFFER_SIZE];

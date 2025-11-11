@@ -11,6 +11,7 @@
 typedef struct {
     GB_sys system;
     char* name;
+    char* location;
     bool has_save;
 } game;
 

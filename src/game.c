@@ -31,10 +31,6 @@ void loadDir(game* game_data, game_holder* Roms, const char* directory){
 
         if((file.name)[0] != '.'){
 			int i = 0;
-            game* g = &game_data[Roms->length];
-            g->name = (char*)malloc(strlen(file.name)+1);
-            strcpy(g->name, file.name);
-            g->has_save = false;
             if(file.is_dir){
 				// Directory.
                 char next_dir[512];
@@ -47,6 +43,11 @@ void loadDir(game* game_data, game_holder* Roms, const char* directory){
 			{
 				i++;
 			}
+            game* g = &game_data[Roms->length];
+            g->name = (char*)malloc(strlen(file.name)+1);
+            g->location = (char*)malloc(512);
+            strcpy(g->name, file.name);
+            strcpy(g->location, directory);
 			if(file.name[i-1] == 'b' && file.name[i-2] == 'g' && file.name[i-3] == '.'){
                 g->system = GB;
                 g->has_save = checkSave(file.name);

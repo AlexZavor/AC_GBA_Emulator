@@ -278,8 +278,10 @@ void gbMEM_deinit()
 {
 	saveRam();
 	memset(MEM, 0, 0x10000); // unload the cartridge and memory
-	if(ram != NULL)
+	if(ram != NULL){
 		free(ram);
+		ram = NULL;
+	}
 	if(cart_fd >0){
 		#ifdef WIN32
 		free(cartridge);
@@ -293,7 +295,7 @@ void gbMEM_deinit()
 
 int gbMEM_insertCart(game* g){
 	char filepath[512];
-	sprintf(filepath, "%s%s", GAME_DIR, g->name);
+	sprintf(filepath, "%s%s", g->location, g->name);
 	cart_fd = open(filepath, O_RDONLY);
 	if (cart_fd >= 0)
 	{
