@@ -8,6 +8,7 @@
 
 #include "gb/gbEmulator.h"
 #include "gbc/gbcEmulator.h"
+#include "gba/gbaEmulator.h"
 
 #define BKG_COLOR 12, 12, 32, 255
 #define RED     {255,   0,   0}
@@ -81,9 +82,14 @@ void menu_run(){
             gbcEmulator_deinit();
             break;
         case GBA:
-            // TODO: Start GBA emulator from menu
-            //Create Emulator
-            menu_alert(ALERT_ERROR,"Game boy Advance game started!");
+            gbaEmulator_init(renderer, e);
+            if(!gbaEmulator_insertCart(Game)){
+                menu_alert(ALERT_ERROR,"Game Could not be loaded!");
+            }else{
+                gbaEmulator_run();
+            }
+            gbaEmulator_deinit();
+            // menu_alert(ALERT_ERROR,"Game boy Advance game started!");
             break;
         }
         resetInputData(&input);

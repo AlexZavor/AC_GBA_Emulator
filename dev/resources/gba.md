@@ -12789,7 +12789,7 @@ Execution Time:
   1S      for  AND,EOR,ADC,SBC,TST,NEG,CMP,CMN,ORR,BIC,MVN
   1S+1I   for  LSL,LSR,ASR,ROR
   1S+mI   for  MUL on ARMv4 (m=1..4; depending on MSBs of incoming Rd value)
-  1S+mI   for  MUL on ARMv5 (m=3; fucking slow, no matter of MSBs of Rd value)
+  1S+mI   for  MUL on ARMv5 (m=3; ***** slow, no matter of MSBs of Rd value)
 ```
 
 

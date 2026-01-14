@@ -30,6 +30,10 @@ Both acid files fail still...
 // TODO: Audio system sadly
 
 
+// The window we'll be rendering to
+SDL_Window* window = NULL;
+// The window renderer
+static SDL_Renderer* renderer = NULL;
 
 bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer){
 	//Initialize SDL
@@ -71,11 +75,12 @@ bool closeSDL(SDL_Window* window, SDL_Renderer* renderer){
 	return true;
 }
 
+void set_window_size(int w, int h){
+	SDL_SetWindowSize(window, w, h);
+	SDL_RenderSetScale(renderer, SCALE, SCALE);
+}
+
 int main(int argc, char* argv[]) {
-	// The window we'll be rendering to
-	SDL_Window* window = NULL;
-	// The window renderer
-	SDL_Renderer* renderer = NULL;
 	// Event handler
 	SDL_Event e;
 

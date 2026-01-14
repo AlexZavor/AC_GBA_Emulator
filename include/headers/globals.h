@@ -14,6 +14,9 @@ typedef enum{
 #define SCREEN_HEIGHT (144)
 #define GREEN_PALLET
 
+#define GBA_SCREEN_WIDTH (240)
+#define GBA_SCREEN_HEIGHT (160)
+
 // Directorys
 #define GAME_DIR "./ROMS/"
 #define SAVE_DIR "./SAVES/"
