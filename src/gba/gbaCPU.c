@@ -798,6 +798,12 @@ int8_t gbaCPU_instruction(){
           case TEQ:
             NZ_check(Op1 ^ Op2);
             break;
+          case AND:
+            NZ_check(Op1 & Op2);
+            break;
+          case ORR:
+            NZ_check(Op1 | Op2);
+            break;
           case MOV:
             NZ_check(Op2);
             break;
@@ -1250,8 +1256,8 @@ int8_t thumb_instr(){
               time = 1;
               registers[Rd] = data;
               break;
-            case 0x3://Branch
-              bool L = (instr>>7)&0x1;
+            case 0x3:{//Branch
+              bool L = get_bit(instr, 7);
               if(L){
                 LR = PC+1;
               }
@@ -1263,6 +1269,7 @@ int8_t thumb_instr(){
               }
               if(PC%2){PC--;}
               return 2; // 2S + 1N
+            }
             default:
               printf("THUMB 5 Op err - 0x%.1X\n", Op);
               Failure(5);
@@ -1313,9 +1320,10 @@ int8_t thumb_instr(){
               gba_write8(addr, registers[Rd]);
             break;
             case 2://LD
-              registers[Rd] = gba_read32(addr);
-              if(addr%4)
-                registers[Rd] = ROR(registers[Rd], ((addr)%4)*8);
+            registers[Rd] = gba_read32(addr);
+            if(addr%4){
+              registers[Rd] = ROR(registers[Rd], ((addr)%4)*8);
+            }
             break;
             case 3://LD byte
               registers[Rd] = gba_read8(addr);
@@ -1351,10 +1359,10 @@ int8_t thumb_instr(){
             case 1://LD byte
               registers[Rd] = sign_extend(gba_read8(addr), 8);
             break;
-            case 2://LD
+            case 2://LD h/word
               registers[Rd] = (uint32_t)gba_read16(addr);
-              if(addr%4)
-                registers[Rd] = ROR(registers[Rd], ((addr)%4)*8);
+              if(addr%2)
+                registers[Rd] = ROR(registers[Rd], ((addr)%2)*8);
             break;
             case 3://LD h/word
               registers[Rd] = sign_extend(gba_read16(addr),16);
@@ -1506,16 +1514,16 @@ int8_t thumb_instr(){
           int moved = 0;
           PC += 2;
           if(POP){
-            for(int x=7; x>=0; x--){
+            for(int x=0; x<8; x++){
               if((rlist>>x)&0x1){
-                SP+=4;
                 registers[x] = gba_read32(SP);
+                SP+=4;
                 moved++;
               }
             }
             if(PC_LR_BIT){
-              SP+=4;
               PC = gba_read32(SP);
+              SP+=4;
               PC -= PC%2;
               moved += 2;
               return moved; //(n+1)S+2N+1I (POP PC)
@@ -1523,14 +1531,14 @@ int8_t thumb_instr(){
             return moved; //nS+1N+1I (POP)
           }else{//PUSH
             if(PC_LR_BIT){
-              gba_write32(SP, LR);
               SP-=4;
+              gba_write32(SP, LR);
               moved++;
             }
-            for(int x=0; x<8; x++){
+            for(int x=7; x>=0; x--){
               if((rlist>>x)&0x1){
-                gba_write32(SP, registers[x]);
                 SP-=4;
+                gba_write32(SP, registers[x]);
                 moved++;
               }
             }

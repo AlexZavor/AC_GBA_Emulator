@@ -220,8 +220,10 @@ void gba_write32(uint32_t addr, uint32_t data){
     ptr_t pointer = get_pointer(addr);
     if(pointer.v && pointer.w){
         *(uint32_t*)pointer.p = data;
-    }else
+    }else{
         printf("could not write addr - %.8X (%s)\n", addr, pointer.v?("ROM"):("not valid"));
+        exit(0);
+    }
 }
 void gba_write16(uint32_t addr, uint16_t data){
     ptr_t pointer = get_pointer(addr);
@@ -263,5 +265,11 @@ void dump_vram(){
     if (f != NULL) {
         fwrite(Vram, 1, VRAM_SIZE, f);
         fclose(f);
+    }
+}
+
+void print_mem(uint32_t start_addr, int words){
+    for(int i = 0; i < words; i++){
+        printf("\t\t%.8X\n",gba_read32(start_addr+(4*i)));
     }
 }

@@ -20,9 +20,8 @@ int print = false;
 
 // Debug stuff
 inline void gba_debug(SDL_Event *e){
-    gbaCPU_print_cycle();
-    // if(PC == 0x08001D68){printf("failed test - %d\n", registers[12]);return -1;}//ARM_mod.gba - vsync wait
-    // if(PC == 0x08000948){printf("failed test - %d\n", registers[7]);return -1;}//thumb.gba - vsync wait
+    // gbaCPU_print_cycle();
+    // if(PC == 0x0801019A)print = true;
     if(print){
         uint32_t instr = gba_read32(PC);
         uint32_t CPSR = get_cpsr();
@@ -34,6 +33,5 @@ inline void gba_debug(SDL_Event *e){
         }
         printf(" \tPC: 0x%.8X   \t| R0-%.8X R1-%.8X R2-%.8X R3-%.8X - %c%c%c%c\n", PC, R(0), R(1), R(2), R(3), N_FLAG?'N':'-', Z_FLAG?'Z':'-', C_FLAG?'C':'-', V_FLAG?'V':'-');
     }
-    // if(PC == 0x08000148)print = true;
-    // if(PC == 0x080000E8)print = false;
+    // if(PC == 0x080101C2)print = false;
 }
